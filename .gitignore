@@ -47,13 +47,14 @@ pyvenv.cfg
 # Dashboard retirado (dashboard_tematico.py es el canónico y está desplegado)
 dashboard/
 
-# Datos sensibles
-data/raw/*.xlsx
-data/processed/*
-data/output/*
+# Datos — ningún Excel ni archivo de datos se versiona
+*.xlsx
+*.xls
+data/raw/**
+data/processed/**
+data/output/**
+data/backup/**
 !data/raw/.gitkeep
-!data/raw/Taxonomias.xlsx
-!data/raw/Taxonomias_MatrizBD.xlsx
 !data/processed/.gitkeep
 !data/output/.gitkeep
 
