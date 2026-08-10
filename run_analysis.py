@@ -31,7 +31,8 @@ from src.perfil_coverage_analyzer import analizar_cobertura_perfil_completa
 from src.shared_subjects_analyzer import detectar_asignaturas_compartidas
 from src.topic_modeler import asignar_topicos_a_programas
 from src.run_tracker import RunTracker
-from config import INPUT_FOLDER, OUTPUT_FOLDER, MESSAGES
+from src.llm_integration import generar_resumen_narrativo
+from config import INPUT_FOLDER, OUTPUT_FOLDER, MESSAGES, CONFIG
 
 # ── Logging ─────────────────────────────────────────────────────────────────
 _log_dir = Path(__file__).parent / 'logs'
@@ -120,12 +121,20 @@ def process_single_program(
             f"({cobertura_perfil['num_brechas']} brechas)"
         )
 
+        resumen_llm = None
+        if CONFIG.get('LLM_ENABLED', False):
+            print("       Generando resumen narrativo (LLM)...")
+            resumen_llm = generar_resumen_narrativo(indicadores, tematicas, cobertura_perfil)
+            if resumen_llm:
+                print(f"       Resumen: {resumen_llm[:80]}...")
+
         return {
             'data': data,
             'indicadores': indicadores,
             'tematicas': tematicas,
             'validacion': validacion,
             'cobertura_perfil': cobertura_perfil,
+            'resumen_llm': resumen_llm,
         }
 
     except Exception as e:

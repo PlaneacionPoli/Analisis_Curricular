@@ -1,6 +1,6 @@
 # ADR-001: Uso del LLM en el Pipeline Microcurricular
 
-**Estado:** PENDIENTE DE DECISIÓN  
+**Estado:** DECIDIDO — Opción A  
 **Fecha de creación:** 2026-08-10  
 **Autoras:** Coordinación Académica + Investigadora principal  
 **Revisión requerida por:** Coordinación Académica
@@ -77,7 +77,7 @@ El sistema permanece 100% determinístico, offline y sin costo operativo de API.
 
 ## Decisión
 
-> **[ ] Opción A — Resúmenes narrativos**  
+> **[x] Opción A — Resúmenes narrativos** ← DECISIÓN TOMADA (2026-08-10)  
 > **[ ] Opción B — Chat/Q&A** *(requiere sprint adicional, no Fase 3)*  
 > **[ ] Opción C — Descartar**
 
