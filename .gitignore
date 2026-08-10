@@ -36,6 +36,13 @@ wheels/
 venv/
 ENV/
 env/
+.venv/
+Scripts/
+Lib/
+Include/
+pyvenv.cfg
+*.exe
+*.dll
 
 # Datos sensibles
 data/raw/*.xlsx

@@ -324,7 +324,7 @@ class ReportGenerator:
         Returns:
             str: Ruta del archivo generado
         """
-        logger.info(f"Generando matriz Excel")
+        logger.info("Generando matriz Excel")
 
         output_path = Path(output_path)
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -369,7 +369,7 @@ class ReportGenerator:
         Returns:
             str: Ruta del archivo generado
         """
-        logger.info(f"Generando reporte JSON")
+        logger.info("Generando reporte JSON")
 
         # Construir estructura JSON
         reporte_json = {

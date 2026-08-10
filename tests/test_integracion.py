@@ -45,7 +45,7 @@ for f in TEST_FILES:
 print("\n" + "="*60)
 print("FASE 2: NÚCLEOS CLEANER")
 print("="*60)
-from src.nucleos_cleaner import filtrar_nucleos_dataframe, es_nucleo_valido
+from src.nucleos_cleaner import es_nucleo_valido
 test_inputs = [
     ('Análisis financiero de estados contables', True),
     ('Expansión A', False),

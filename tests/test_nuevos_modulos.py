@@ -101,7 +101,7 @@ def test_shared_subjects():
 
 
 def test_topic_modeler():
-    from src.topic_modeler import entrenar_lda, obtener_fingerprint_tfidf
+    from src.topic_modeler import entrenar_lda
     corpus = [
         'analisis financiero de estados contables aplicacion de normas NIIF',
         'mercadeo estrategico plan de marketing investigacion de mercados',

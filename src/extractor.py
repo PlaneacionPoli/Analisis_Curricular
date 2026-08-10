@@ -9,7 +9,7 @@ resultados de aprendizaje, estrategias pedagógicas y más.
 import logging
 import re
 from pathlib import Path
-from typing import Dict, Optional, List, Tuple
+from typing import Dict, Optional, List
 import pandas as pd
 import openpyxl
 from openpyxl.utils.exceptions import InvalidFileException
@@ -241,7 +241,7 @@ class ExcelExtractor:
         if header_row is None and expected_columns:
             header_row = self._find_header_row(sheet, expected_columns)
             if header_row is None:
-                logger.warning(f"Usando primera fila como header por defecto")
+                logger.warning("Usando primera fila como header por defecto")
                 header_row = 0
         elif header_row is None:
             header_row = 0

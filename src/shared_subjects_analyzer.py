@@ -10,9 +10,8 @@ Orden de análisis:
 import logging
 import re
 import unicodedata
-from typing import Dict, List, Tuple, Optional
+from typing import Dict
 import pandas as pd
-import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
@@ -20,7 +19,6 @@ import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from config import NUCLEOS_CONFIG
 
 logger = logging.getLogger(__name__)
 

@@ -9,15 +9,14 @@ Valida estructura y redacción de:
 """
 
 import logging
-import re
-from typing import Dict, List, Optional
+from typing import Dict, List
 import pandas as pd
 
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from config import TAXONOMIA_BLOOM, EXPECTED_COLUMNS
+from config import TAXONOMIA_BLOOM
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

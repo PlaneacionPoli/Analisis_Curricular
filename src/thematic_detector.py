@@ -8,16 +8,14 @@ análisis de keywords y contexto.
 
 import logging
 import re
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 import pandas as pd
-import numpy as np
-from collections import Counter
 
 import sys
 from pathlib import Path
 sys.path.append(str(Path(__file__).parent.parent))
 
-from config import TEMATICAS, get_tematicas_list, get_keywords_for_tematica
+from config import TEMATICAS
 
 # Configurar logging
 logging.basicConfig(
@@ -332,11 +330,11 @@ class ThematicDetector:
                     nombre_asignatura_col = col
                 if 'Semestre' in col:
                     semestre_col = col
-            
+
             if nombre_asignatura_col and 'Créditos' in df_estrategias.columns:
                 # Obtener créditos por asignatura (primera fila de cada asignatura)
                 df_estrategias['_creditos_num'] = pd.to_numeric(df_estrategias['Créditos'], errors='coerce')
-                
+
                 # Filtrar filas válidas:
                 # 1. Excluir filas donde Semestre contenga "Total" o sea nulo
                 # 2. Excluir filas donde el nombre de asignatura sea nulo o contenga solo números
@@ -347,17 +345,17 @@ class ThematicDetector:
                     )
                 else:
                     df_estrategias['_es_fila_valida'] = True
-                
+
                 # Filtrar también por créditos válidos (<=30)
                 df_estrategias['_es_fila_valida'] = df_estrategias['_es_fila_valida'] & (
-                    (df_estrategias['_creditos_num'].notna()) & 
+                    (df_estrategias['_creditos_num'].notna()) &
                     (df_estrategias['_creditos_num'] <= 30)
                 )
-                
+
                 # Agrupar por asignatura y tomar el primer valor de créditos válido
                 df_validas = df_estrategias[df_estrategias['_es_fila_valida']]
                 asignaturas_creditos = df_validas.groupby(nombre_asignatura_col)['_creditos_num'].first()
-                
+
                 # Filtrar valores válidos
                 creditos_totales = float(asignaturas_creditos.sum()) if len(asignaturas_creditos) > 0 else 0.0
                 logger.info(f"Créditos totales calculados: {creditos_totales}")
@@ -382,17 +380,17 @@ class ThematicDetector:
             asignaturas_con_tematica = 0
             if not df_estrategias.empty and f'{tematica}_presente' in df_estrategias.columns and nombre_asignatura_col:
                 # Agrupar por asignatura y verificar si al menos una fila de esa asignatura tiene la temática
-                estrategias_tematica = df_estrategias[df_estrategias[f'{tematica}_presente'] == True]
+                estrategias_tematica = df_estrategias[df_estrategias[f'{tematica}_presente']]
                 if not estrategias_tematica.empty:
                     # Contar asignaturas únicas que tienen esta temática
                     asignaturas_con_tematica = estrategias_tematica[nombre_asignatura_col].nunique()
                     freq_estrategias = asignaturas_con_tematica
 
             total = freq_comp + freq_ra + freq_estrategias
-            
+
             # Normalizar por créditos (por cada 10 créditos)
             por_creditos = (total / creditos_totales * 10) if creditos_totales > 0 else 0
-            
+
             presente = total > 0
 
             if presente:

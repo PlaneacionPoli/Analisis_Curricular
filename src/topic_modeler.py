@@ -8,7 +8,7 @@ familias de conocimiento y agrupaciones temáticas entre programas.
 import logging
 import re
 import unicodedata
-from typing import Dict, List, Optional
+from typing import Dict, List
 import pandas as pd
 import numpy as np
 from sklearn.feature_extraction.text import CountVectorizer

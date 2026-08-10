@@ -11,8 +11,6 @@ import re
 import unicodedata
 from typing import List, Tuple, Optional
 import pandas as pd
-import numpy as np
-from collections import Counter
 from sklearn.feature_extraction.text import TfidfVectorizer
 
 import sys
@@ -44,8 +42,22 @@ _INICIO_INVALIDO = re.compile(
 # Terminan con letra suelta tipo "Expansión A", "Tema B" (truncamiento)
 _FINAL_LETRA_SUELTA = re.compile(r'\s+[A-Za-z]$')
 
-_KEYWORDS_ACADEMICAS_POS = [
-    'analisis', 'fundamentacion', 'teorica', 'practica', 'aplicacion',
+# ============================================================================
+# VOCABULARIOS PARA EL PUNTAJE ORIENTATIVO DE NÚCLEOS TEMÁTICOS
+# ============================================================================
+# El puntaje distingue si una entrada nombra CONTENIDO (qué se estudia) o
+# describe el FORMATO/SECUENCIA de la actividad (cómo o cuándo se trabaja).
+# No expresa juicio sobre calidad pedagógica: un taller no vale menos que
+# un análisis. Se renombraron las listas (antes "positivas"/"negativas")
+# porque esa etiqueta sugería una jerarquía que el criterio no sostiene.
+#
+# Advertencia de uso: el puntaje es INFORMATIVO. No filtra núcleos ni
+# alimenta ningún indicador. Antes de darle función decisoria deben
+# resolverse las limitaciones anotadas abajo.
+
+# Sustantivos que nombran objetos, procesos o instrumentos de estudio.
+_VOCAB_CONTENIDO = [
+    'analisis', 'fundamentacion', 'teorica', 'aplicacion',
     'evaluacion', 'diagnostico', 'planeacion', 'gestion', 'desarrollo',
     'investigacion', 'innovacion', 'estrategia', 'metodologia', 'sistema',
     'proceso', 'modelo', 'marco', 'enfoque', 'metodo', 'tecnica',
@@ -53,12 +65,40 @@ _KEYWORDS_ACADEMICAS_POS = [
     'componente', 'elemento', 'estructura', 'funcion', 'mecanismo',
 ]
 
-_KEYWORDS_ACADEMICAS_NEG = [
-    'taller', 'ejercicio', 'practica', 'lectura', 'exposicion', 'debate',
+# Términos que designan la MODALIDAD de trabajo, no el tema.
+#
+# LIMITACIÓN CONOCIDA: varios son contenido sustantivo según la disciplina
+# —'lectura' en literatura y derecho; 'campo' y 'salida' en geología,
+# biología o antropología—, y otros ('debate', 'seminario') nombran
+# estrategias de alta exigencia cognitiva. La lista los penaliza por igual.
+# Requiere validación disciplinar antes de cualquier uso decisorio.
+_VOCAB_FORMATO = [
+    'taller', 'ejercicio', 'lectura', 'exposicion', 'debate',
     'salida', 'campo', 'visita', 'conferencia', 'seminario', 'charla',
-    'introduccion', 'bienvenida', 'presentacion', 'generalidades',
+    'presentacion',
+]
+
+# Términos que marcan la POSICIÓN de un contenido en la secuencia del curso
+# o su carácter preparatorio. Categoría distinta del formato: no describen
+# cómo se trabaja sino cuándo, por lo que se separan para no mezclar
+# criterios heterogéneos en un mismo conteo.
+_VOCAB_SECUENCIA = [
+    'introduccion', 'bienvenida', 'generalidades',
     'induccion', 'nivelacion', 'repaso', 'repaso general',
 ]
+
+# NOTA: el término 'practica' se retiró de ambas listas. Figuraba
+# simultáneamente en la positiva y en la negativa, de modo que sumaba y
+# restaba en la misma operación (p. ej. "Taller de práctica clínica"
+# activaba ambos efectos). Su significado depende del contexto —práctica
+# profesional es contenido; práctica de laboratorio es formato— y no puede
+# resolverse por coincidencia léxica. Queda fuera hasta que se disponga de
+# un criterio de desambiguación validado.
+
+# Alias retrocompatibles. Se conservan para no romper importaciones
+# existentes; usar los nombres nuevos en código nuevo.
+_KEYWORDS_ACADEMICAS_POS = _VOCAB_CONTENIDO
+_KEYWORDS_ACADEMICAS_NEG = _VOCAB_FORMATO + _VOCAB_SECUENCIA
 
 
 def _normalizar(texto: str) -> str:
@@ -143,27 +183,33 @@ def es_nucleo_valido(texto: str) -> Tuple[bool, str]:
 
 def calcular_score_academico(texto: str) -> float:
     """
-    Calcula un score académico (0-1) para un núcleo temático basado en
-    keywords positivas y negativas.
+    Puntaje orientativo (0-1) que estima si una entrada nombra contenido
+    curricular o describe el formato/secuencia de una actividad.
+
+    ESTATUTO: informativo, no decisorio. Se calcula DESPUÉS de que
+    es_nucleo_valido() ya resolvió qué entra al corpus, no modifica esa
+    decisión y no alimenta ningún indicador del estudio. Su único destino
+    es una columna de apoyo para revisión humana.
+
+    Suma por cada término de contenido presente, suma por extensión del
+    texto, y resta por términos de formato o de secuencia.
 
     Args:
         texto: Núcleo temático
 
     Returns:
-        Score entre 0 y 1
+        Puntaje entre 0 y 1
     """
     t = _normalizar(texto)
     palabras = t.split()
     if not palabras:
         return 0.0
-    pos = sum(1 for kw in _KEYWORDS_ACADEMICAS_POS if kw in t)
-    neg = sum(1 for kw in _KEYWORDS_ACADEMICAS_NEG if kw in t)
+    contenido = sum(1 for kw in _VOCAB_CONTENIDO if kw in t)
+    formato = sum(1 for kw in _VOCAB_FORMATO if kw in t)
+    secuencia = sum(1 for kw in _VOCAB_SECUENCIA if kw in t)
     total = len(palabras)
-    if total == 0:
-        return 0.0
-    score = (pos * 0.15 + total * 0.02) - (neg * 0.1)
-    score = max(0.0, min(1.0, score))
-    return round(score, 4)
+    score = (contenido * 0.15 + total * 0.02) - ((formato + secuencia) * 0.1)
+    return round(max(0.0, min(1.0, score)), 4)
 
 
 def filtrar_nucleos_dataframe(
