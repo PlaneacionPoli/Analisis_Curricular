@@ -23,6 +23,7 @@ logger = logging.getLogger(__name__)
 N_TOPICS_DEFAULT = 10
 N_TOP_WORDS = 15
 STOPWORDS = [
+    # Artículos, preposiciones, conjunciones
     'el', 'la', 'de', 'que', 'y', 'a', 'en', 'un', 'ser', 'se',
     'no', 'por', 'con', 'su', 'para', 'como', 'estar', 'tener',
     'le', 'lo', 'del', 'las', 'los', 'al', 'una', 'es', 'e', 'o',
@@ -32,6 +33,21 @@ STOPWORDS = [
     'les', 'ni', 'contra', 'otros', 'fueron', 'ese', 'eso', 'ante',
     'ellos', 'esto', 'mi', 'antes', 'algunos', 'unos', 'yo',
     'te', 'ti', 'nos', 'cada', 'asi',
+    # Términos académicos estructurales genéricos que producen tópicos
+    # poco interpretables (p.ej. T3 con «generalidades», T10 con «antropoceno»
+    # era un artefacto de términos muy raros y muy frecuentes a la vez).
+    # Se añaden aquí para que el LDA no los use como palabras representativas
+    # de un tópico — no se eliminan del corpus, solo de las features.
+    'generalidades', 'introduccion', 'conceptos', 'basicos', 'fundamentos',
+    'aspectos', 'elementos', 'principios', 'nociones', 'nociones basicas',
+    'teoria', 'marco', 'general', 'aplicacion', 'aplicaciones',
+    'proceso', 'procesos', 'sistema', 'sistemas', 'gestion',
+    'analisis', 'desarrollo', 'implementacion', 'evaluacion',
+    'metodologia', 'metodo', 'tecnica', 'herramienta', 'modelo',
+    # Términos de bajo poder discriminativo en currículo universitario
+    'estudiante', 'estudiantes', 'docente', 'aprendizaje', 'ensenanza',
+    'competencia', 'competencias', 'resultado', 'objetivo', 'actividad',
+    'estrategia', 'area', 'campo', 'nivel', 'tipo', 'forma', 'uso', 'manera',
 ]
 
 
