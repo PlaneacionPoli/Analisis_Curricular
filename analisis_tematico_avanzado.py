@@ -10,6 +10,14 @@ Autor: Sistema de Analisis Curricular
 Fecha: 2026-02-10
 """
 
+# Cuando Streamlit Cloud ejecuta este archivo como app principal,
+# redirigir al dashboard interactivo real.
+import sys as _sys
+if any('streamlit' in _arg for _arg in _sys.argv):
+    from dashboard_tematico import main as _dash_main
+    _dash_main()
+    _sys.exit(0)
+
 from pathlib import Path
 from datetime import datetime
 import pandas as pd
