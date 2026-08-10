@@ -44,6 +44,9 @@ pyvenv.cfg
 *.exe
 *.dll
 
+# Dashboard retirado (dashboard_tematico.py es el canónico y está desplegado)
+dashboard/
+
 # Datos sensibles
 data/raw/*.xlsx
 data/processed/*

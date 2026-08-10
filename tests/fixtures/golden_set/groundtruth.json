@@ -1,0 +1,299 @@
+{
+  "_instrucciones": {
+    "proposito": "Este archivo contiene las etiquetas humanas de referencia (ground truth) para 15 programas seleccionados del corpus. Se usa para medir la precision real del sistema de deteccion tematica y cobertura de perfil.",
+    "como_etiquetar": {
+      "tematicas": "Para cada programa, abre el Excel y revisa competencias, RA y nucleos tematicos del Paso 5. Marca 'true' si la tematica esta genuinamente presente en el contenido curricular (no solo mencionada de paso), 'false' si no lo esta.",
+      "cobertura_perfil": "Revisa el perfil de egreso (Paso 1) y el microcurriculo (Paso 5). Estima visualmente si el currículo cubre el perfil. Rango: 0.0 (nula) a 1.0 (total). Precision: 0.1",
+      "umbral_coincidencia_aceptable": "Un resultado se considera correcto si la diferencia entre la estimacion humana y el calculo del sistema es <= 0.15 para cobertura, y coincide en presencia/ausencia para tematicas."
+    },
+    "quien_etiqueta": "La investigadora principal (Coordinacion Academica). Cada programa debe ser revisado directamente en el archivo Excel, no por inferencia.",
+    "fecha_etiquetado": "COMPLETAR"
+  },
+  "programas": [
+    {
+      "archivo": "FormatoRA_AdmonEmpresas_PBOG.xlsx",
+      "programa": "Administración de Empresas - Bogotá",
+      "etiquetado": false,
+      "tematicas_humanas": {
+        "SOSTENIBILIDAD": null,
+        "INTELIGENCIA ARTIFICIAL": null,
+        "RESPONSABILIDAD SOCIAL EMPRESARIAL": null,
+        "TRANSFORMACION DIGITAL": null,
+        "INNOVACION Y EMPRENDIMIENTO": null,
+        "GLOBALIZACION Y PERSPECTIVA GLOCAL": null,
+        "ETICA Y VALORES": null,
+        "LIDERAZGO Y HABILIDADES BLANDAS": null,
+        "ANALISIS DE DATOS": null,
+        "GESTION DEL CAMBIO": null
+      },
+      "cobertura_perfil_humana": null,
+      "notas": ""
+    },
+    {
+      "archivo": "FormatoRA_AdmonEmpresas_HMED.xlsx",
+      "programa": "Administración de Empresas - Medellín HED",
+      "etiquetado": false,
+      "tematicas_humanas": {
+        "SOSTENIBILIDAD": null,
+        "INTELIGENCIA ARTIFICIAL": null,
+        "RESPONSABILIDAD SOCIAL EMPRESARIAL": null,
+        "TRANSFORMACION DIGITAL": null,
+        "INNOVACION Y EMPRENDIMIENTO": null,
+        "GLOBALIZACION Y PERSPECTIVA GLOCAL": null,
+        "ETICA Y VALORES": null,
+        "LIDERAZGO Y HABILIDADES BLANDAS": null,
+        "ANALISIS DE DATOS": null,
+        "GESTION DEL CAMBIO": null
+      },
+      "cobertura_perfil_humana": null,
+      "notas": ""
+    },
+    {
+      "archivo": "FormatoRA_ContPub_PBOG.xlsx",
+      "programa": "Contaduría Pública - Bogotá",
+      "etiquetado": false,
+      "tematicas_humanas": {
+        "SOSTENIBILIDAD": null,
+        "INTELIGENCIA ARTIFICIAL": null,
+        "RESPONSABILIDAD SOCIAL EMPRESARIAL": null,
+        "TRANSFORMACION DIGITAL": null,
+        "INNOVACION Y EMPRENDIMIENTO": null,
+        "GLOBALIZACION Y PERSPECTIVA GLOCAL": null,
+        "ETICA Y VALORES": null,
+        "LIDERAZGO Y HABILIDADES BLANDAS": null,
+        "ANALISIS DE DATOS": null,
+        "GESTION DEL CAMBIO": null
+      },
+      "cobertura_perfil_humana": null,
+      "notas": ""
+    },
+    {
+      "archivo": "FormatoRA_ContPub_VNAL.xlsx",
+      "programa": "Contaduría Pública - Virtual",
+      "etiquetado": false,
+      "tematicas_humanas": {
+        "SOSTENIBILIDAD": null,
+        "INTELIGENCIA ARTIFICIAL": null,
+        "RESPONSABILIDAD SOCIAL EMPRESARIAL": null,
+        "TRANSFORMACION DIGITAL": null,
+        "INNOVACION Y EMPRENDIMIENTO": null,
+        "GLOBALIZACION Y PERSPECTIVA GLOCAL": null,
+        "ETICA Y VALORES": null,
+        "LIDERAZGO Y HABILIDADES BLANDAS": null,
+        "ANALISIS DE DATOS": null,
+        "GESTION DEL CAMBIO": null
+      },
+      "cobertura_perfil_humana": null,
+      "notas": ""
+    },
+    {
+      "archivo": "FormatoRA_Derecho_VNAL.xlsx",
+      "programa": "Derecho - Virtual",
+      "etiquetado": false,
+      "tematicas_humanas": {
+        "SOSTENIBILIDAD": null,
+        "INTELIGENCIA ARTIFICIAL": null,
+        "RESPONSABILIDAD SOCIAL EMPRESARIAL": null,
+        "TRANSFORMACION DIGITAL": null,
+        "INNOVACION Y EMPRENDIMIENTO": null,
+        "GLOBALIZACION Y PERSPECTIVA GLOCAL": null,
+        "ETICA Y VALORES": null,
+        "LIDERAZGO Y HABILIDADES BLANDAS": null,
+        "ANALISIS DE DATOS": null,
+        "GESTION DEL CAMBIO": null
+      },
+      "cobertura_perfil_humana": null,
+      "notas": ""
+    },
+    {
+      "archivo": "FormatoRA_Derecho_HMED.xlsx",
+      "programa": "Derecho - Medellín HED",
+      "etiquetado": false,
+      "tematicas_humanas": {
+        "SOSTENIBILIDAD": null,
+        "INTELIGENCIA ARTIFICIAL": null,
+        "RESPONSABILIDAD SOCIAL EMPRESARIAL": null,
+        "TRANSFORMACION DIGITAL": null,
+        "INNOVACION Y EMPRENDIMIENTO": null,
+        "GLOBALIZACION Y PERSPECTIVA GLOCAL": null,
+        "ETICA Y VALORES": null,
+        "LIDERAZGO Y HABILIDADES BLANDAS": null,
+        "ANALISIS DE DATOS": null,
+        "GESTION DEL CAMBIO": null
+      },
+      "cobertura_perfil_humana": null,
+      "notas": ""
+    },
+    {
+      "archivo": "FormatoRA_DisenoGrafico_PBOG.xlsx",
+      "programa": "Diseño Gráfico - Bogotá",
+      "etiquetado": false,
+      "tematicas_humanas": {
+        "SOSTENIBILIDAD": null,
+        "INTELIGENCIA ARTIFICIAL": null,
+        "RESPONSABILIDAD SOCIAL EMPRESARIAL": null,
+        "TRANSFORMACION DIGITAL": null,
+        "INNOVACION Y EMPRENDIMIENTO": null,
+        "GLOBALIZACION Y PERSPECTIVA GLOCAL": null,
+        "ETICA Y VALORES": null,
+        "LIDERAZGO Y HABILIDADES BLANDAS": null,
+        "ANALISIS DE DATOS": null,
+        "GESTION DEL CAMBIO": null
+      },
+      "cobertura_perfil_humana": null,
+      "notas": ""
+    },
+    {
+      "archivo": "FormatoRA_MercadeoPublicidad_PBOG.xlsx",
+      "programa": "Mercadeo y Publicidad - Bogotá",
+      "etiquetado": false,
+      "tematicas_humanas": {
+        "SOSTENIBILIDAD": null,
+        "INTELIGENCIA ARTIFICIAL": null,
+        "RESPONSABILIDAD SOCIAL EMPRESARIAL": null,
+        "TRANSFORMACION DIGITAL": null,
+        "INNOVACION Y EMPRENDIMIENTO": null,
+        "GLOBALIZACION Y PERSPECTIVA GLOCAL": null,
+        "ETICA Y VALORES": null,
+        "LIDERAZGO Y HABILIDADES BLANDAS": null,
+        "ANALISIS DE DATOS": null,
+        "GESTION DEL CAMBIO": null
+      },
+      "cobertura_perfil_humana": null,
+      "notas": ""
+    },
+    {
+      "archivo": "FormatoRA_PsicoOrganizacional_PBOG.xlsx",
+      "programa": "Psicología Organizacional - Bogotá",
+      "etiquetado": false,
+      "tematicas_humanas": {
+        "SOSTENIBILIDAD": null,
+        "INTELIGENCIA ARTIFICIAL": null,
+        "RESPONSABILIDAD SOCIAL EMPRESARIAL": null,
+        "TRANSFORMACION DIGITAL": null,
+        "INNOVACION Y EMPRENDIMIENTO": null,
+        "GLOBALIZACION Y PERSPECTIVA GLOCAL": null,
+        "ETICA Y VALORES": null,
+        "LIDERAZGO Y HABILIDADES BLANDAS": null,
+        "ANALISIS DE DATOS": null,
+        "GESTION DEL CAMBIO": null
+      },
+      "cobertura_perfil_humana": null,
+      "notas": ""
+    },
+    {
+      "archivo": "FormatoRA_SaludOcupacional_VNAL.xlsx",
+      "programa": "Salud Ocupacional - Virtual",
+      "etiquetado": false,
+      "tematicas_humanas": {
+        "SOSTENIBILIDAD": null,
+        "INTELIGENCIA ARTIFICIAL": null,
+        "RESPONSABILIDAD SOCIAL EMPRESARIAL": null,
+        "TRANSFORMACION DIGITAL": null,
+        "INNOVACION Y EMPRENDIMIENTO": null,
+        "GLOBALIZACION Y PERSPECTIVA GLOCAL": null,
+        "ETICA Y VALORES": null,
+        "LIDERAZGO Y HABILIDADES BLANDAS": null,
+        "ANALISIS DE DATOS": null,
+        "GESTION DEL CAMBIO": null
+      },
+      "cobertura_perfil_humana": null,
+      "notas": ""
+    },
+    {
+      "archivo": "FormatoRA_ComunicacionSocialPeriodismo_PBOG.xlsx",
+      "programa": "Comunicación Social y Periodismo - Bogotá",
+      "etiquetado": false,
+      "tematicas_humanas": {
+        "SOSTENIBILIDAD": null,
+        "INTELIGENCIA ARTIFICIAL": null,
+        "RESPONSABILIDAD SOCIAL EMPRESARIAL": null,
+        "TRANSFORMACION DIGITAL": null,
+        "INNOVACION Y EMPRENDIMIENTO": null,
+        "GLOBALIZACION Y PERSPECTIVA GLOCAL": null,
+        "ETICA Y VALORES": null,
+        "LIDERAZGO Y HABILIDADES BLANDAS": null,
+        "ANALISIS DE DATOS": null,
+        "GESTION DEL CAMBIO": null
+      },
+      "cobertura_perfil_humana": null,
+      "notas": ""
+    },
+    {
+      "archivo": "FormatoRA_IngSistemas_PBOG.xlsx",
+      "programa": "Ingeniería de Sistemas - Bogotá",
+      "etiquetado": false,
+      "tematicas_humanas": {
+        "SOSTENIBILIDAD": null,
+        "INTELIGENCIA ARTIFICIAL": null,
+        "RESPONSABILIDAD SOCIAL EMPRESARIAL": null,
+        "TRANSFORMACION DIGITAL": null,
+        "INNOVACION Y EMPRENDIMIENTO": null,
+        "GLOBALIZACION Y PERSPECTIVA GLOCAL": null,
+        "ETICA Y VALORES": null,
+        "LIDERAZGO Y HABILIDADES BLANDAS": null,
+        "ANALISIS DE DATOS": null,
+        "GESTION DEL CAMBIO": null
+      },
+      "cobertura_perfil_humana": null,
+      "notas": ""
+    },
+    {
+      "archivo": "FormatoRA_IngIndustrial_PBOG.xlsx",
+      "programa": "Ingeniería Industrial - Bogotá",
+      "etiquetado": false,
+      "tematicas_humanas": {
+        "SOSTENIBILIDAD": null,
+        "INTELIGENCIA ARTIFICIAL": null,
+        "RESPONSABILIDAD SOCIAL EMPRESARIAL": null,
+        "TRANSFORMACION DIGITAL": null,
+        "INNOVACION Y EMPRENDIMIENTO": null,
+        "GLOBALIZACION Y PERSPECTIVA GLOCAL": null,
+        "ETICA Y VALORES": null,
+        "LIDERAZGO Y HABILIDADES BLANDAS": null,
+        "ANALISIS DE DATOS": null,
+        "GESTION DEL CAMBIO": null
+      },
+      "cobertura_perfil_humana": null,
+      "notas": ""
+    },
+    {
+      "archivo": "FormatoRA_AdmonHotelGastro_PBOG.xlsx",
+      "programa": "Administración Hotelera y Gastronómica - Bogotá",
+      "etiquetado": false,
+      "tematicas_humanas": {
+        "SOSTENIBILIDAD": null,
+        "INTELIGENCIA ARTIFICIAL": null,
+        "RESPONSABILIDAD SOCIAL EMPRESARIAL": null,
+        "TRANSFORMACION DIGITAL": null,
+        "INNOVACION Y EMPRENDIMIENTO": null,
+        "GLOBALIZACION Y PERSPECTIVA GLOCAL": null,
+        "ETICA Y VALORES": null,
+        "LIDERAZGO Y HABILIDADES BLANDAS": null,
+        "ANALISIS DE DATOS": null,
+        "GESTION DEL CAMBIO": null
+      },
+      "cobertura_perfil_humana": null,
+      "notas": ""
+    },
+    {
+      "archivo": "FormatoRA_EspGerTributaria_PBOG.xlsx",
+      "programa": "Especialización Gerencia Tributaria - Bogotá",
+      "etiquetado": false,
+      "tematicas_humanas": {
+        "SOSTENIBILIDAD": null,
+        "INTELIGENCIA ARTIFICIAL": null,
+        "RESPONSABILIDAD SOCIAL EMPRESARIAL": null,
+        "TRANSFORMACION DIGITAL": null,
+        "INNOVACION Y EMPRENDIMIENTO": null,
+        "GLOBALIZACION Y PERSPECTIVA GLOCAL": null,
+        "ETICA Y VALORES": null,
+        "LIDERAZGO Y HABILIDADES BLANDAS": null,
+        "ANALISIS DE DATOS": null,
+        "GESTION DEL CAMBIO": null
+      },
+      "cobertura_perfil_humana": null,
+      "notas": ""
+    }
+  ]
+}
