@@ -26,7 +26,10 @@ from config import (
     TIPOS_SABER,
     COMPLEJIDAD_THRESHOLDS,
     BALANCE_IDEAL_SABER,
-    QUALITY_WEIGHTS
+    QUALITY_WEIGHTS,
+    NIVEL_TAXONOMICO_MAP,
+    TAXONOMIA_DEFAULT,
+    DOMINIO_DEFAULT
 )
 
 # Configurar logging
@@ -35,6 +38,59 @@ logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
 )
 logger = logging.getLogger(__name__)
+
+
+def _quitar_tildes(valor) -> str:
+    """Quita tildes/diacríticos de un valor, preservando el resto del texto."""
+    texto = unicodedata.normalize('NFKD', str(valor))
+    return ''.join(c for c in texto if not unicodedata.combining(c))
+
+
+def normalizar_nivel_dominio(valor) -> str:
+    """Normaliza un valor de la columna 'Nivel Dominio' para comparación exacta.
+
+    Quita tildes, pasa a minúsculas y elimina el sufijo de sistema ('BAK' o
+    'B') al final del valor, p.ej. 'AnálisisBAK' -> 'analisis',
+    'ComprensiónB' -> 'comprension'.
+    """
+    if pd.isna(valor):
+        return ''
+    texto = _quitar_tildes(valor).strip().lower()
+    for sufijo in ('bak', 'b'):
+        if texto.endswith(sufijo) and len(texto) > len(sufijo):
+            texto = texto[: -len(sufijo)]
+            break
+    return texto.strip()
+
+
+def normalizar_taxonomia(valor) -> str:
+    """Resuelve el sistema taxonómico declarado ('BLOOM' o 'BAK').
+
+    Si el valor está vacío se asume Bloom (compatibilidad con matrices que
+    no declaran la columna 'Taxonomía').
+    """
+    if pd.isna(valor) or not str(valor).strip():
+        return TAXONOMIA_DEFAULT
+    texto = _quitar_tildes(valor).strip().upper()
+    return 'BAK' if 'BAK' in texto else 'BLOOM'
+
+
+def normalizar_dominio_asociado(valor) -> str:
+    """Resuelve el dominio declarado ('COGNITIVO', 'PROCEDIMENTAL' o 'ACTITUDINAL').
+
+    Los valores reales incluyen el sufijo de sistema (p.ej. 'CognitivoBAK',
+    'ProcedimentalBAK', 'CognitivoB'); se resuelve por coincidencia de
+    subcadena porque el sufijo varía. Si el valor está vacío se asume
+    Cognitivo (dominio por defecto de la mayoría de los RA).
+    """
+    if pd.isna(valor) or not str(valor).strip():
+        return DOMINIO_DEFAULT
+    texto = _quitar_tildes(valor).strip().upper()
+    if 'PROCEDIMENT' in texto:
+        return 'PROCEDIMENTAL'
+    if 'ACTITUD' in texto:
+        return 'ACTITUDINAL'
+    return 'COGNITIVO'
 
 
 class CurricularAnalyzer:
@@ -122,47 +178,75 @@ class CurricularAnalyzer:
         logger.info(f"Balance tipo saber: {balance}")
         return balance
 
-    def _get_nivel_taxonomico(self, verbo: str, nivel_dominio: str) -> int:
+    def _get_nivel_taxonomico(
+        self,
+        verbo: str,
+        nivel_dominio: str,
+        taxonomia: str = None,
+        dominio: str = None,
+        texto_ra: str = None,
+    ) -> float:
         """
-        Determina el nivel taxonómico (1-6) de un verbo.
+        Determina el nivel taxonómico (escala 1-6) de un resultado de aprendizaje.
 
-        ADR-04: Nivel Dominio es la fuente primaria; si no está disponible
-        se usa la taxonomía de Bloom como fallback.
+        Las matrices institucionales declaran dos sistemas taxonómicos distintos
+        (columna "Taxonomía"): Bloom clásica, que aplica los mismos 6 niveles a
+        los tres dominios, y BAK (Bloom adaptada con aportes de Krathwohl), que
+        usa progresiones propias y más cortas para los dominios procedimental y
+        actitudinal (columna "Dominio Asociado"). Cada progresión se normaliza
+        de forma independiente a la escala común 1-6 — ver
+        ``NIVEL_TAXONOMICO_MAP`` en config.py y su criterio de equivalencia.
+
+        ADR-04 (vigente): "Nivel Dominio" es la fuente primaria; el verbo del
+        RA se usa solo como fallback cuando "Nivel Dominio" está vacío o no se
+        reconoce en el mapa de equivalencias.
 
         Args:
-            verbo (str): Verbo del RA
-            nivel_dominio (str): Nivel de dominio declarado
+            verbo (str): Verbo del RA (fallback)
+            nivel_dominio (str): Nivel de dominio declarado (columna "Nivel Dominio")
+            taxonomia (str): Sistema declarado (columna "Taxonomía"). Si no se
+                declara se asume Bloom, para mantener compatibilidad con
+                matrices que no incluyen esta columna.
+            dominio (str): Dominio declarado (columna "Dominio Asociado"). Si
+                no se declara se asume Cognitivo.
+            texto_ra (str): Texto del resultado de aprendizaje, solo para
+                trazabilidad en el log cuando se recurre al valor por defecto.
 
         Returns:
-            int: Nivel taxonómico (1=Recordar, 6=Crear)
+            float: Nivel taxonómico normalizado en escala 1-6.
         """
-        # 1. Intentar inferir del nivel_dominio (fuente primaria)
-        if not pd.isna(nivel_dominio):
-            nivel_str = str(nivel_dominio).lower()
+        # 1. Intentar resolver desde nivel_dominio + taxonomia + dominio (fuente primaria)
+        if not pd.isna(nivel_dominio) and str(nivel_dominio).strip():
+            nivel_norm = normalizar_nivel_dominio(nivel_dominio)
+            taxonomia_key = normalizar_taxonomia(taxonomia)
+            dominio_key = normalizar_dominio_asociado(dominio)
 
-            if 'crea' in nivel_str or 'disena' in nivel_str:
-                return 6
-            elif 'evalua' in nivel_str or 'critica' in nivel_str:
-                return 5
-            elif 'analisis' in nivel_str or 'analis' in nivel_str:
-                return 4
-            elif 'aplic' in nivel_str:
-                return 3
-            elif 'comprend' in nivel_str or 'entiend' in nivel_str:
-                return 2
-            elif 'recuerd' in nivel_str or 'identific' in nivel_str or 'reconoc' in nivel_str:
-                return 1
+            mapa = NIVEL_TAXONOMICO_MAP.get(taxonomia_key, {}).get(dominio_key, {})
+            if nivel_norm in mapa:
+                return mapa[nivel_norm]
 
-        # 2. Fallback: buscar en taxonomía de Bloom
-        if not pd.isna(verbo):
+            logger.warning(
+                f"[{self.programa_nombre}] 'Nivel Dominio'={nivel_dominio!r} "
+                f"(taxonomía={taxonomia!r}, dominio={dominio!r}) no coincide con "
+                f"ningún nivel de {taxonomia_key}/{dominio_key}. "
+                f"Verbo RA={verbo!r}. Se intentará el fallback por verbo."
+            )
+
+        # 2. Fallback: buscar en taxonomía de Bloom por verbo
+        if not pd.isna(verbo) and str(verbo).strip():
             verbo_lower = str(verbo).lower().strip()
             for nivel_nombre, config in TAXONOMIA_BLOOM.items():
                 verbos_nivel = [v.lower() for v in config['verbos']]
                 if verbo_lower in verbos_nivel:
-                    return config['nivel']
+                    return float(config['nivel'])
 
-        # Nivel por defecto
-        return 2
+        # 3. Nivel por defecto — se registra para poder auditar cuántos RA caen aquí
+        logger.warning(
+            f"[{self.programa_nombre}] No fue posible determinar el nivel "
+            f"taxonómico (Nivel Dominio={nivel_dominio!r}, Verbo RA={verbo!r}). "
+            f"RA: {texto_ra!r}. Se usa el valor por defecto (2)."
+        )
+        return 2.0
 
     def _contar_asignaturas_unicas(self) -> int:
         """
@@ -247,7 +331,11 @@ class CurricularAnalyzer:
 
     def calcular_complejidad_cognitiva(self) -> Dict[str, float]:
         """
-        Calcula la distribución de niveles de complejidad cognitiva según Bloom.
+        Calcula la distribución de niveles de complejidad cognitiva.
+
+        Resuelve el nivel de cada RA según el sistema taxonómico que declare
+        (Bloom o BAK, columnas "Taxonomía"/"Dominio Asociado"/"Nivel Dominio"),
+        normalizado a la escala común 1-6 (ver ``_get_nivel_taxonomico``).
 
         Returns:
             Dict con estructura:
@@ -277,15 +365,23 @@ class CurricularAnalyzer:
         for _, row in self.ra.iterrows():
             verbo = row.get('Verbo RA', '')
             nivel_dominio = row.get('Nivel Dominio', '')
-            nivel = self._get_nivel_taxonomico(verbo, nivel_dominio)
+            taxonomia = row.get('Taxonomía', '')
+            dominio = row.get('Dominio Asociado', '')
+            texto_ra = row.get('Resultados Aprendizaje', '')
+            nivel = self._get_nivel_taxonomico(verbo, nivel_dominio, taxonomia, dominio, texto_ra)
             niveles.append(nivel)
 
         total = len(niveles)
 
-        # Clasificar por complejidad
-        basico = sum(1 for n in niveles if COMPLEJIDAD_THRESHOLDS['BASICO'][0] <= n <= COMPLEJIDAD_THRESHOLDS['BASICO'][1])
-        intermedio = sum(1 for n in niveles if COMPLEJIDAD_THRESHOLDS['INTERMEDIO'][0] <= n <= COMPLEJIDAD_THRESHOLDS['INTERMEDIO'][1])
-        avanzado = sum(1 for n in niveles if COMPLEJIDAD_THRESHOLDS['AVANZADO'][0] <= n <= COMPLEJIDAD_THRESHOLDS['AVANZADO'][1])
+        # Clasificar por complejidad. Los sistemas BAK con progresiones cortas
+        # (p.ej. 4 niveles) producen valores fraccionarios (ver
+        # NIVEL_TAXONOMICO_MAP); para clasificarlos contra los umbrales enteros
+        # de COMPLEJIDAD_THRESHOLDS se redondea al entero más cercano (1-6). El
+        # promedio/índice de complejidad, en cambio, usa el valor continuo.
+        niveles_clasificacion = [max(1, min(6, round(n))) for n in niveles]
+        basico = sum(1 for n in niveles_clasificacion if COMPLEJIDAD_THRESHOLDS['BASICO'][0] <= n <= COMPLEJIDAD_THRESHOLDS['BASICO'][1])
+        intermedio = sum(1 for n in niveles_clasificacion if COMPLEJIDAD_THRESHOLDS['INTERMEDIO'][0] <= n <= COMPLEJIDAD_THRESHOLDS['INTERMEDIO'][1])
+        avanzado = sum(1 for n in niveles_clasificacion if COMPLEJIDAD_THRESHOLDS['AVANZADO'][0] <= n <= COMPLEJIDAD_THRESHOLDS['AVANZADO'][1])
 
         # Calcular porcentajes
         resultado = {

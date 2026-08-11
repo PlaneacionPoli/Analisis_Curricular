@@ -57,9 +57,9 @@ EXCEL_SHEETS = {
 
 # Fila donde empiezan los headers en cada hoja (0-indexed)
 HEADER_ROWS = {
-    'COMPETENCIAS': 1,  # Header en fila 2 (índice 1)
+    'COMPETENCIAS': 2,  # Header en fila 3 (índice 2) - la fila 2 tiene instrucciones
     'RESULTADOS_APRENDIZAJE': 1,  # Header en fila 2 (índice 1) - la fila 1 tiene instrucciones
-    'ESTRATEGIAS_MESO': 0,
+    'ESTRATEGIAS_MESO': 1,  # Header en fila 2 (índice 1) - la fila 1 tiene instrucciones
     'ESTRATEGIAS_MICRO': 1,  # Header en fila 2 (índice 1)
     'PERFIL_EGRESO': 1  # Header en fila 2 (índice 1); fila 1 tiene placeholders
 }
@@ -296,6 +296,69 @@ TAXONOMIA_BLOOM = {
 
 # Tipos de saber
 TIPOS_SABER = ['Saber', 'SaberHacer', 'SaberSer']
+
+# ============================================================================
+# SISTEMAS TAXONÓMICOS DECLARADOS (columnas "Taxonomía" / "Dominio Asociado")
+# ============================================================================
+# Las matrices institucionales declaran, por resultado de aprendizaje, el
+# sistema taxonómico usado (columna "Taxonomía": 'Bloom' o 'BAK') y el
+# dominio (columna "Dominio Asociado": Cognitivo/Procedimental/Actitudinal,
+# con sufijo 'B' o 'BAK' según el sistema, p.ej. 'CognitivoBAK').
+#
+# Bloom aplica la misma progresión de 6 niveles a los tres dominios. BAK
+# (Bloom adaptada con aportes de Krathwohl) usa progresiones propias y más
+# cortas para los dominios procedimental y actitudinal, y una progresión de
+# 5 niveles (sin 'Evaluación') para el cognitivo.
+#
+# Criterio de equivalencia (ADR pendiente de numerar): cada progresión se
+# normaliza de forma independiente a la escala común 1-6 — el nivel más
+# bajo de la progresión propia del dominio equivale a 1, el más alto a 6, y
+# los niveles intermedios se distribuyen proporcionalmente entre ambos
+# extremos. Esto permite comparar la complejidad cognitiva entre programas
+# que declaran sistemas distintos, aunque el número de niveles de cada
+# progresión no coincida. Ejemplo (BAK procedimental, 4 niveles):
+# Imitación=1, Manipulación=2.6667, Precisión=4.3333, Control=6.
+
+TAXONOMIA_DEFAULT = 'BLOOM'
+DOMINIO_DEFAULT = 'COGNITIVO'
+
+# Progresiones ordenadas de menor a mayor complejidad (nombres normalizados:
+# sin tildes, minúsculas, sin sufijo de sistema)
+PROGRESIONES_TAXONOMICAS = {
+    'BLOOM': {
+        'COGNITIVO': ['conocimiento', 'comprension', 'aplicacion', 'analisis', 'sintesis', 'evaluacion'],
+        'PROCEDIMENTAL': ['conocimiento', 'comprension', 'aplicacion', 'analisis', 'sintesis', 'evaluacion'],
+        'ACTITUDINAL': ['conocimiento', 'comprension', 'aplicacion', 'analisis', 'sintesis', 'evaluacion'],
+    },
+    'BAK': {
+        'COGNITIVO': ['conocimiento', 'comprension', 'aplicacion', 'analisis', 'sintesis'],
+        'PROCEDIMENTAL': ['imitacion', 'manipulacion', 'precision', 'control'],
+        'ACTITUDINAL': ['percepcion', 'responder', 'valorar', 'organizar'],
+    },
+}
+
+
+def _progresion_a_niveles(progresion: List[str]) -> Dict[str, float]:
+    """Normaliza una progresión (de menor a mayor complejidad) a escala 1-6.
+
+    El primer elemento equivale a 1, el último a 6, y los intermedios se
+    distribuyen proporcionalmente entre ambos extremos.
+    """
+    n = len(progresion)
+    if n == 1:
+        return {progresion[0]: 1.0}
+    paso = 5.0 / (n - 1)
+    return {nombre: round(1 + i * paso, 4) for i, nombre in enumerate(progresion)}
+
+
+# Mapa final: {taxonomia: {dominio: {nombre_nivel_normalizado: nivel_1_a_6}}}
+NIVEL_TAXONOMICO_MAP = {
+    taxonomia: {
+        dominio: _progresion_a_niveles(progresion)
+        for dominio, progresion in dominios.items()
+    }
+    for taxonomia, dominios in PROGRESIONES_TAXONOMICAS.items()
+}
 
 # ============================================================================
 # INDICADORES Y MÉTRICAS

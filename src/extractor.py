@@ -223,9 +223,17 @@ class ExcelExtractor:
 
         Args:
             sheet_name (str): Nombre de la hoja
-            header_row (Optional[int]): Fila del header (0-indexed).
-                                       Si es None, se detecta automáticamente
-            expected_columns (Optional[List[str]]): Columnas esperadas para validación
+            header_row (Optional[int]): Fila del header (0-indexed) a usar
+                como respaldo si la detección automática no encuentra una
+                coincidencia suficiente (ver ``expected_columns``). Si no se
+                proporciona, el respaldo es la primera fila (0).
+            expected_columns (Optional[List[str]]): Columnas esperadas. Si se
+                proporcionan, se usan para detectar automáticamente la fila
+                real de headers en cada archivo (``_find_header_row``), que
+                tiene prioridad sobre ``header_row``: la posición del header
+                varía entre variantes de plantilla (algunas tienen una fila
+                de instrucciones extra antes del header, otras no), así que
+                un valor fijo por hoja no es confiable para todo el corpus.
 
         Returns:
             pd.DataFrame: Datos de la hoja
@@ -237,10 +245,16 @@ class ExcelExtractor:
 
         sheet = self.workbook[sheet_name]
 
-        # Detectar header si no se proporciona
-        if header_row is None and expected_columns:
-            header_row = self._find_header_row(sheet, expected_columns)
-            if header_row is None:
+        # La detección automática (por coincidencia de columnas esperadas)
+        # es la fuente de verdad cuando tiene éxito, porque la fila de header
+        # varía entre variantes de plantilla; header_row solo se usa como
+        # respaldo cuando la detección no encuentra una coincidencia
+        # suficiente (p.ej. un archivo con nombres de columna no estándar).
+        if expected_columns:
+            detectado = self._find_header_row(sheet, expected_columns)
+            if detectado is not None:
+                header_row = detectado
+            elif header_row is None:
                 logger.warning(f"Usando primera fila como header por defecto")
                 header_row = 0
         elif header_row is None:
@@ -260,9 +274,70 @@ class ExcelExtractor:
         # Remover filas completamente vacías
         df = df.dropna(how='all')
 
+        # Rellenar columnas combinadas (merged) verticalmente en el Excel de
+        # origen: cuando una asignatura/estrategia/registro ocupa un bloque
+        # de varias filas (p.ej. una fila por cada Tipo de Saber que
+        # desarrolla), las columnas combinadas solo tienen valor en la
+        # primera fila del bloque; el resto quedan en NaN. Sin este relleno,
+        # cualquier análisis agrupado por esas columnas pierde silenciosamente
+        # las filas siguientes del bloque. Se detecta a partir de los rangos
+        # combinados reales del archivo (no de una lista fija por hoja),
+        # porque el patrón puede variar levemente entre plantillas.
+        columnas_combinadas = self._detectar_columnas_combinadas(sheet, header_row)
+        df = self._rellenar_celdas_combinadas(df, columnas_combinadas)
+
         logger.debug(f"Hoja '{sheet_name}' leída: {len(df)} filas, "
                     f"{len(df.columns)} columnas")
 
+        return df
+
+    def _detectar_columnas_combinadas(self, sheet, header_row: int) -> set:
+        """
+        Determina qué columnas (por nombre de header) están combinadas
+        (merged) verticalmente en la zona de datos de la hoja.
+
+        Solo cuentan las combinaciones que (a) abarcan más de una fila y
+        (b) están por debajo de la fila de header, porque son las que dejan
+        NaN en las filas de continuación al leerse con pandas/openpyxl. Una
+        combinación de una sola celda o ubicada en filas de instrucciones
+        (por encima del header) no causa ese problema.
+
+        Args:
+            sheet: hoja de openpyxl (con sus merged_cells.ranges).
+            header_row (int): fila del header, 0-indexed (como la usa pandas).
+
+        Returns:
+            set[str]: nombres de columna (texto exacto del header) que deben
+                rellenarse hacia adelante.
+        """
+        header_row_excel = header_row + 1  # openpyxl es 1-indexado
+        columnas = set()
+        for merged_range in sheet.merged_cells.ranges:
+            abarca_varias_filas = merged_range.max_row > merged_range.min_row
+            esta_en_zona_de_datos = merged_range.min_row > header_row_excel
+            if abarca_varias_filas and esta_en_zona_de_datos:
+                for col_idx in range(merged_range.min_col, merged_range.max_col + 1):
+                    valor = sheet.cell(row=header_row_excel, column=col_idx).value
+                    if valor:
+                        columnas.add(str(valor).strip())
+        return columnas
+
+    def _rellenar_celdas_combinadas(self, df: pd.DataFrame, columnas_combinadas: set) -> pd.DataFrame:
+        """
+        Rellena hacia adelante (forward-fill) las columnas detectadas como
+        combinadas (ver ``_detectar_columnas_combinadas``). openpyxl/pandas
+        solo devuelven el valor en la primera celda del rango combinado.
+
+        Args:
+            df: DataFrame recién leído de la hoja.
+            columnas_combinadas: nombres de columna a rellenar.
+
+        Returns:
+            pd.DataFrame con las columnas combinadas rellenadas.
+        """
+        columnas_presentes = [c for c in df.columns if str(c).strip() in columnas_combinadas]
+        if columnas_presentes:
+            df[columnas_presentes] = df[columnas_presentes].ffill()
         return df
 
     def extract_competencias(self) -> pd.DataFrame:
