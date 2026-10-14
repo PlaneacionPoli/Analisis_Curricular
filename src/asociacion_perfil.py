@@ -188,8 +188,8 @@ except (OSError, ValueError):
     pass
 
 
-def _raiz(l: str) -> str:
-    return l[:RAIZ] if len(l) >= RAIZ else l
+def _raiz(lema: str) -> str:
+    return lema[:RAIZ] if len(lema) >= RAIZ else lema
 LEMAS_GENERICOS = {'cualquier', 'tipo', 'especialmente', 'distinto', 'diferente', 'clave', 'forma', 'manera', 'nivel',
                    'ambito', 'capaz', 'capacidad', 'grande', 'nuevo', 'propio', 'general', 'campo', 'existente',
                    'emergente', 'junior', 'ser', 'estar', 'tener', 'hacer', 'poder', 'permitir', 'contar', 'realizar', 'llevar'}
@@ -238,7 +238,7 @@ def _tokens(texto: str):
 
 def lemas(texto: str) -> frozenset:
     """Lemas de contenido (sustantivos, adjetivos, verbos, nombres propios), sin tildes."""
-    return frozenset(l for l, _ in _tokens(texto))
+    return frozenset(lema for lema, _ in _tokens(texto))
 
 
 SUSTANTIVOS_LIGEROS = {'gestion', 'sector', 'area', 'organizacion', 'empresa', 'proceso', 'actividad', 'campo',
@@ -257,11 +257,11 @@ def actividad_de_rol(texto: str) -> List[str]:
     toks = _tokens(texto)
     if not toks:
         return []
-    l = toks[0][0]
-    l = re.sub(r'a$', '', l) if re.search(r'(dor|tor|sor)a$', l) else l
-    if l in AGENTE_IRREGULAR:
-        return AGENTE_IRREGULAR[l]
-    m = re.match(r'^([a-z]+?)(ador|edor|idor)$', l)
+    lema = toks[0][0]
+    lema = re.sub(r'a$', '', lema) if re.search(r'(dor|tor|sor)a$', lema) else lema
+    if lema in AGENTE_IRREGULAR:
+        return AGENTE_IRREGULAR[lema]
+    m = re.match(r'^([a-z]+?)(ador|edor|idor)$', lema)
     if m:
         v = m.group(1) + {'ador': 'ar', 'edor': 'er', 'idor': 'ir'}[m.group(2)]
         return [v, m.group(1) + 'acion' if m.group(2) == 'ador' else m.group(1) + 'cion']
@@ -273,15 +273,17 @@ def nucleo_item(texto: str, contexto: frozenset = frozenset()) -> List[str]:
     de contexto, ese adjetivo («planes tácticos» → plan + táctico; «planes estratégicos» → plan, si «estratégico»
     es contexto de la matriz)."""
     toks = _tokens(texto)
-    libre = lambda l: l not in SUSTANTIVOS_LIGEROS and _raiz(l) not in contexto
+    def libre(lema):
+        return lema not in SUSTANTIVOS_LIGEROS and _raiz(lema) not in contexto
+
     for pos in (('NOUN', 'PROPN'), ('ADJ',)):
-        j = next((j for j, (l, p) in enumerate(toks) if p in pos and libre(l)), None)
+        j = next((j for j, (lema, p) in enumerate(toks) if p in pos and libre(lema)), None)
         if j is not None:
             out = [toks[j][0]]
             if pos[0] == 'NOUN' and j + 1 < len(toks) and toks[j + 1][1] == 'ADJ' and libre(toks[j + 1][0]):
                 out.append(toks[j + 1][0])
             return out
-    j = next((l for l, p in toks if p in ('NOUN', 'PROPN')), toks[0][0] if toks else '')
+    j = next((lema for lema, p in toks if p in ('NOUN', 'PROPN')), toks[0][0] if toks else '')
     return [j] if j else []
 
 
@@ -327,7 +329,7 @@ def _filas(wb, pref, avisos, capa):
 
 def _expandir(ls: frozenset) -> List[tuple]:
     """Cada lema del ítem con sus formas equivalentes expresadas como raíces: (lema, {raíces})."""
-    return [(l, {_raiz(x) for x in {l} | SINONIMOS.get(l, set())}) for l in sorted(ls)]
+    return [(lema, {_raiz(x) for x in {lema} | SINONIMOS.get(lema, set())}) for lema in sorted(ls)]
 
 
 def _clausulas(texto: str) -> List[str]:
@@ -467,14 +469,16 @@ def puntajes(m: Dict, items: List[Dict]) -> Dict:
     # tipo de unidad: en asignaturas, «indicador» = desarrollo evaluado; nombre y núcleo = mención
     tipo_u = {capa: [t for e in m['entidades'][capa] for t in e.get('tipos', ['indicador'] * len(e['unidades']))] for capa in CAPAS}
     L_u = {capa: [frozenset(_raiz(x) for x in lemas(u)) for _, u in unidades[capa]] for capa in CAPAS}
-    todas = [l for capa in CAPAS for l in L_u[capa]]
+    todas = [lema for capa in CAPAS for lema in L_u[capa]]
     n = max(len(todas), 1)
     df = {}
     for ls in todas:
-        for l in ls:
-            df[l] = df.get(l, 0) + 1
-    contexto = {l for l, c in df.items() if c / n > UMBRAL_CONTEXTO}
-    idf = lambda l: float(np.log((n + 1) / (df.get(_raiz(l), 0) + 1)) + 1) * (PESO_CONTEXTO if _raiz(l) in contexto else 1.0)
+        for lema in ls:
+            df[lema] = df.get(lema, 0) + 1
+    contexto = {lema for lema, c in df.items() if c / n > UMBRAL_CONTEXTO}
+    def idf(lema):
+        return float(np.log((n + 1) / (df.get(_raiz(lema), 0) + 1)) + 1) * (PESO_CONTEXTO if _raiz(lema) in contexto else 1.0)
+
     E_items = _embed([i['item'] for i in items])
     out = {}
     for capa in CAPAS:
@@ -492,23 +496,23 @@ def puntajes(m: Dict, items: List[Dict]) -> Dict:
             # la actividad del rol y sus sinónimos: «conciliador» → conciliar, conciliación, conflicto, negociación
             rol = {_raiz(x) for a in actividad for x in {a} | SINONIMOS.get(a, set())}
             # el sustantivo de agente cuenta como su actividad: «Educador» ~ «educación», «Formador» ~ «formación»
-            grupos = [(l, g | rol if re.search(r'(dor|tor|sor)$', l) or l in AGENTE_IRREGULAR else g)
-                      for l, g in _expandir(lemas(it['item']))]
-            total = sum(idf(l) for l, _ in grupos) or 1.0
+            grupos = [(lema, g | rol if re.search(r'(dor|tor|sor)$', lema) or lema in AGENTE_IRREGULAR else g)
+                      for lema, g in _expandir(lemas(it['item']))]
+            total = sum(idf(lema) for lema, _ in grupos) or 1.0
             nucleo = [{_raiz(x) for x in {t} | SINONIMOS.get(t, set())} for t in nucleo_item(it['item'], frozenset(contexto))]
             raices_n = {r for g in nucleo for r in g}
-            w_n = {l: idf(l) * (PESO_NUCLEO if g & raices_n else 1.0) for l, g in grupos}
+            w_n = {lema: idf(lema) * (PESO_NUCLEO if g & raices_n else 1.0) for lema, g in grupos}
             total_n = sum(w_n.values()) or 1.0
             mejor, mejor_n = {}, {}
             d_c, d_n = {}, {}
             for j, ((k, u), lu) in enumerate(zip(unidades[capa], L_u[capa])):
-                c = sum(idf(l) for l, g in grupos if g & lu) / total
+                c = sum(idf(lema) for lema, g in grupos if g & lu) / total
                 if rol and not (rol & lu):          # regla estructural: un rol solo se respalda si su actividad está presente
                     c *= FACTOR_ROL
                 s_ = float(S[i, j])
                 if (c, s_) > mejor.get(k, (-1, -1, None))[:2]:
                     mejor[k] = (c, s_, u)
-                c_n = sum(w_n[l] for l, g in grupos if g & lu) / total_n
+                c_n = sum(w_n[lema] for lema, g in grupos if g & lu) / total_n
                 if rol and not (rol & lu):
                     c_n *= FACTOR_ROL
                 if (c_n, s_) > mejor_n.get(k, (-1, -1, None))[:2]:

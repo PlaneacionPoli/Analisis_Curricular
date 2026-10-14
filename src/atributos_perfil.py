@@ -175,17 +175,17 @@ def _enumeracion(texto: str) -> List[str]:
 
 
 def _bloques(texto: str) -> List[str]:
-    lineas = [l.strip() for l in str(texto).split('\n')]
+    lineas = [linea.strip() for linea in str(texto).split('\n')]
     bloques, prosa = [], []
-    for l in lineas:
-        if not l:
+    for linea in lineas:
+        if not linea:
             continue
-        if l.endswith(':') and prosa:
+        if linea.endswith(':') and prosa:
             continue
-        if re.match(r'^(?:[-–—•*]|\d+[.)])\s*', l):
-            bloques.append(re.sub(r'^(?:[-–—•*]|\d+[.)])\s*', '', l))
+        if re.match(r'^(?:[-–—•*]|\d+[.)])\s*', linea):
+            bloques.append(re.sub(r'^(?:[-–—•*]|\d+[.)])\s*', '', linea))
         else:
-            prosa.append(l)
+            prosa.append(linea)
     return [' '.join(prosa)] + bloques if prosa else bloques
 
 

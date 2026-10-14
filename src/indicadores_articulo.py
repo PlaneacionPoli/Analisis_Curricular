@@ -217,7 +217,9 @@ def calcular_indicadores(archivos: Iterable[Tuple[str, object]], v1: Dict[str, T
     est = [e for m in matrices for e in m['estrategias']]
     inds = [{'matriz': m['matriz'], 'sede': m['sede'], 'estrategia': s, 'indicador': i, 'nivel': n}
             for m in matrices for s, i, n in m['indicadores']]
-    pct = lambda xs: round(100 * sum(xs) / len(xs), 1) if xs else None
+    def pct(xs):
+        return round(100 * sum(xs) / len(xs), 1) if xs else None
+
     por_matriz = []
     for m in matrices:
         r, e = m['ras'], m['estrategias']
@@ -408,7 +410,9 @@ def valorar_matriz(fila: Dict, sin_respaldo_pct: float = None, exigencia: float 
         lista de dicts: Variable, Tramo, Criterio, Resultado, Estado y Referencia (mediana del conjunto).
     """
     ref = referencia or {}
-    f = lambda x: '—' if x is None else f'{x:.0f} %'.replace('.', ',')
+    def f(x):
+        return '—' if x is None else f'{x:.0f} %'.replace('.', ',')
+
     n_ra, n_est = fila.get('RA únicos') or 0, fila.get('Estrategias') or 0
     directas = round((fila.get('Evidencia directa %') or 0) * n_est / 100)
     resultado = {

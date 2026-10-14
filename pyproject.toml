@@ -8,6 +8,12 @@ ignore = []
 
 [tool.ruff.lint.per-file-ignores]
 "tests/test_integracion.py" = ["E402", "E701", "E501"]
+# expresiones regulares y plantillas HTML largas: partirlas las haría menos legibles
+"src/asociacion_perfil.py" = ["E501"]
+"src/atributos_perfil.py" = ["E501"]
+"src/indicadores_articulo.py" = ["E501"]
+"src/report_generator.py" = ["E501"]
+"tests/test_atributos_perfil.py" = ["E501"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

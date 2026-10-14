@@ -1,7 +1,6 @@
 """Taxonomías de los RA: contraste del Paso 3 con la base de verbos (src/taxonomias_ra.py)."""
 import os
 
-import pandas as pd
 import pytest
 
 from src import informes_pdf as ip

@@ -10,7 +10,7 @@ La calibración recorre una rejilla de umbrales y elige la combinación que maxi
 (cada tipo de programa pesa lo mismo; desempate por acuerdo). Lo usan el aplicativo y
 auditoria/scripts/calibrar_asociacion_perfil.py.
 """
-from typing import Dict, Iterable, List, Tuple
+from typing import Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
