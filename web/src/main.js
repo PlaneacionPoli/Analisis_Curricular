@@ -76,20 +76,17 @@ function listaMatrices() {
     .sort((a, b) => cmp(a.etiqueta, b.etiqueta));
 }
 
-function barraLateral(hayDatos) {
-  const { pagina, datos, filtros } = obtener();
+function barraLateral() {
+  const { pagina } = obtener();
   const actual = PAGINAS.find(p => p[0] === pagina);
-  const programas = datos ? [...new Set(datos.filas.filter(f => !filtros.facultad || filtros.facultad === 'Todos' || f.Facultad === filtros.facultad).map(f => f.Programa).filter(Boolean))].sort(cmp) : [];
   return h('aside', { class: 'lateral' },
     h('img', { class: 'logo', src: `${import.meta.env.BASE_URL}logo_poli.png`, alt: 'Politécnico Grancolombiano' }),
+    h('p', { class: 'creado-por' }, 'Creado por: Gerencia de Planeación y Gestión Institucional'),
     h('h2', {}, 'Configuración'),
     h('nav', {}, ...PAGINAS.map(([n, i]) => h('button', { type: 'button', class: n === pagina ? 'activo' : '',
       onclick: () => { actualizar({ pagina: n }); window.scrollTo(0, 0); } }, icono(i), n))),
     h('p', { class: 'nav-desc' }, actual[2]),
-    hayDatos ? selector('Programa', ['Todos', ...programas], filtros.programa,
-      v => actualizar({ filtros: { ...filtros, programa: v }, matriz: null })) : null,
-    hayDatos ? selectorMatriz() : null,
-    h('p', { class: 'pie' }, 'Politécnico Grancolombiano', h('br'), 'Análisis Microcurricular v2.0', h('br'), h('span', { class: 'creado-por' }, 'Creado por: Gerencia de Planeación y Gestión Institucional')));
+    h('p', { class: 'pie' }, 'Politécnico Grancolombiano', h('br'), 'Análisis Microcurricular v2.0'));
 }
 
 function selectorMatriz() {
@@ -110,9 +107,12 @@ function filtrosGlobales() {
   // al cambiar de facultad se limpia el programa elegido (podría no pertenecer a ella)
   const facultad = selector('Facultad', valores('Facultad'), filtros.facultad ?? 'Todos',
     v => actualizar({ filtros: { ...filtros, facultad: v, programa: 'Todos' }, matriz: null }));
+  const programas = [...new Set(datos.filas.filter(f => !filtros.facultad || filtros.facultad === 'Todos' || f.Facultad === filtros.facultad).map(f => f.Programa).filter(Boolean))].sort(cmp);
+  const programa = selector('Programa', ['Todos', ...programas], filtros.programa, v => actualizar({ filtros: { ...filtros, programa: v }, matriz: null }));
   return h('section', { class: 'filtros' }, h('b', {}, icono('funnel'), ' Filtros'),
-    h('div', { class: 'columnas', style: { '--n': 4 } },
-      facultad, campo('Modalidad', 'Modalidad', 'modalidad'), campo('Sede', 'Sede', 'sede'), campo('Nivel', 'Nivel', 'nivel')));
+    h('div', { class: 'columnas', style: { '--n': 3 } },
+      facultad, programa, campo('Modalidad', 'Modalidad', 'modalidad'),
+      campo('Sede', 'Sede', 'sede'), campo('Nivel', 'Nivel', 'nivel'), selectorMatriz()));
 }
 
 function contenido() {
@@ -212,7 +212,7 @@ function render() {
   const raiz = document.getElementById('app');
   const hayDatos = !!datos && !progreso;
   raiz.replaceChildren(
-    barraLateral(hayDatos && datos.filas.length > 0),
+    barraLateral(),
     h('main', { class: 'principal' }, ...(hayDatos ? contenido() : [paginaLanding(alSeleccionar)])));
   if (ultimaPagina !== obtener().pagina) { window.scrollTo(0, 0); ultimaPagina = obtener().pagina; }
 }
