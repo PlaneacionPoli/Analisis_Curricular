@@ -16,17 +16,30 @@ const norm = t => String(t ?? '').normalize('NFKD').replace(/[^\x00-\x7f]/g, '')
 const mediana = v => { const s = v.filter(x => x != null).sort((a, b) => a - b); if (!s.length) return null; const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 const fmt = x => (x == null ? '—' : x);
 
+async function leerTodas(archivos, alAvance = null) {
+  const base = await baseVerbos();
+  const ra = [];
+  for (let i = 0; i < archivos.length; i++) {
+    alAvance?.(i, archivos.length);
+    await ceder();
+    try { ra.push(...leerRA(new Uint8Array(archivos[i].buffer), archivos[i].nombre)); } catch { /* archivo sin Paso 3 legible */ }
+  }
+  return contrastar(ra, base);
+}
+
+/** RA únicos con su contraste frente a la base de verbos (compartido con el Resumen Ejecutivo y los informes PDF). */
+export async function taxonomiasRA(archivos) {
+  const firma = archivos.map(a => a.huella ?? a.nombre).join('|');
+  if (local.firma === firma && local.cache) return local.cache;
+  const ra = await leerTodas(archivos);
+  local.firma = firma; local.cache = ra;
+  return ra;
+}
+
 async function calcular(archivos, rerender) {
   local.cargando = true; local.error = null;
   try {
-    const base = await baseVerbos();
-    const ra = [];
-    for (let i = 0; i < archivos.length; i++) {
-      local.avance = [i, archivos.length]; rerender();
-      await ceder();
-      try { ra.push(...leerRA(new Uint8Array(archivos[i].buffer), archivos[i].nombre)); } catch { /* archivo sin Paso 3 legible */ }
-    }
-    local.cache = contrastar(ra, base);
+    local.cache = await leerTodas(archivos, (i, n) => { local.avance = [i, n]; rerender(); });
   } catch (e) { local.error = String(e?.message ?? e); }
   local.cargando = false; local.avance = null; rerender();
 }

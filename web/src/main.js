@@ -10,7 +10,6 @@ import { paginaPendiente } from './pages/pendiente.js';
 import { paginaPerfil, reiniciarPerfil } from './pages/perfil.js';
 import { paginaCobertura } from './pages/cobertura.js';
 import { paginaConfigTendencias, paginaTendencias } from './pages/tendencias.js';
-import { paginaIndicadores } from './pages/indicadores.js';
 import { paginaResumen } from './pages/resumen.js';
 import { paginaFamilias } from './pages/familias.js';
 import { paginaMineria } from './pages/mineria.js';
@@ -23,9 +22,8 @@ import { aviso, h, icono, selector } from './ui.js';
 // [nombre, icono, descripción, fase en la que se porta]
 const PAGINAS = [
   ['Inicio', 'house', 'Resumen general y métricas clave del currículo', 1],
-  ['Resumen Ejecutivo', 'clipboard-data', 'Alertas y fortalezas derivadas de los archivos cargados', 5, true],
+  ['Resumen Ejecutivo', 'clipboard-data', 'Estado del conjunto, V1–V5, prioridades y informes PDF', 5, true],
   ['Tipo de Saber', 'bar-chart', 'Saber, SaberHacer y SaberSer por semestre y asignatura', 2, true],
-  ['Indicadores V1–V5', 'speedometer2', 'Coherencia, trazabilidad y evidencia del logro (R1–R7)', 3, true],
   ['Perfil de Egreso (V1)', 'person-check', 'Asociación del perfil con competencias, RA y asignaturas', 4, true],
   ['Cobertura Temática', 'map', 'Núcleos temáticos: diversidad y densidad por programa', 2, true],
   ['Tendencias Globales', 'graph-up-arrow', 'Alineación con IA, Sostenibilidad, Innovación, etc.', 2, true],
@@ -187,13 +185,6 @@ function contenido() {
     const ids = new Set(filas.map(f => f.Matriz));
     const m = obtener().matriz;
     bloques.push(paginaMineria({ filas, etiqueta: new Map(todas.map(x => [x.id, x.etiqueta])), seleccion: m && ids.has(m) ? m : null, rerender: render }));
-  }
-  else if (pagina === 'Indicadores V1–V5') {
-    const todas = listaMatrices();
-    const ids = new Set(filas.map(f => f.Matriz));
-    const m = obtener().matriz;
-    bloques.push(paginaIndicadores({ filas, archivos, archivoDe: new Map(todas.map(x => [x.id, x.archivo])), etiqueta: new Map(todas.map(x => [x.id, x.etiqueta])),
-      seleccion: m && ids.has(m) ? m : null, rerender: render }));
   }
   else if (pagina === 'Resumen Ejecutivo') {
     const todas = listaMatrices();

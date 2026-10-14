@@ -143,7 +143,7 @@ export function selector(etiqueta, opciones, valor, alCambiar, clase = '') {
 
 /** Descarga de un texto como archivo. */
 export function descargar(nombre, contenido, mime = 'text/plain') {
-  const url = URL.createObjectURL(new Blob([contenido], { type: `${mime};charset=utf-8` }));
+  const url = URL.createObjectURL(new Blob([contenido], { type: mime.startsWith('text/') ? `${mime};charset=utf-8` : mime }));
   const a = h('a', { href: url, download: nombre });
   document.body.append(a);
   a.click();

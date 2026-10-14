@@ -102,10 +102,10 @@ export function resumirTendencias(filasSub, aciertos) {
     for (const [tid, kws] of Object.entries(hit)) {
       if (a) { asig[tid].add(a); if (!porMatriz[tid].has(f.Matriz)) porMatriz[tid].set(f.Matriz, new Set()); porMatriz[tid].get(f.Matriz).add(a); }
       if (!detalle[tid].has(f.Matriz)) detalle[tid].set(f.Matriz, []);
-      const campos = [];
+      const campos = [], textos = {};
       const ctx = { RA: f['Resultado de aprendizaje'], Nucleos: f['Nucleos tematicos'], Indicadores: f['Indicadores de logro asignatura o modulo'], Proceso: f['Proceso Responsable'] };
-      for (const kw of kws) for (const [c, tx] of Object.entries(ctx)) if (tx && patron(kw).test(normalizar(tx)) && !campos.includes(c)) campos.push(c);
-      detalle[tid].get(f.Matriz).push({ asignatura: a || 'Sin nombre', keywords: kws, campos });
+      for (const kw of kws) for (const [c, tx] of Object.entries(ctx)) if (tx && patron(kw).test(normalizar(tx)) && !campos.includes(c)) { campos.push(c); textos[c] = String(tx); }
+      detalle[tid].get(f.Matriz).push({ asignatura: a || 'Sin nombre', keywords: kws, campos, textos });
     }
   }
   const conteo = Object.fromEntries(Object.keys(T).map(t => [t, asig[t].size]));

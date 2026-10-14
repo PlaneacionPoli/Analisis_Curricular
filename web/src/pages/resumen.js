@@ -1,76 +1,77 @@
 // Página «Resumen Ejecutivo»: ¿cómo está el conjunto?, ¿qué matrices requieren atención primero?, ¿qué hacer en cada una?
 // Todo sale de los archivos cargados y de los filtros activos; son propuestas para validar por el comité.
 import * as XLSX from 'xlsx';
-import { agregar, CRITERIOS, referenciasConjunto, valorarMatriz } from '../data/indicadores.js';
-import { cuantil, mediana } from '../data/estadistica.js';
-import { aciertosPorFila, cargarConfig, configActual, hayConfig, resumirTendencias } from '../data/tendencias.js';
-import { cmp } from '../data/util.js';
+import { CRITERIOS_EVALUADOS as CRITERIOS } from '../data/indicadores.js';
+import { cargarConfig, hayConfig } from '../data/tendencias.js';
+import { porGrupo } from '../data/taxonomias.js';
 import { aviso, botonDescarga, columnas, descargar, grafico, h, info, metrica, selector, tabla, titulo } from '../ui.js';
-import { datosIndicadores } from './indicadores.js';
+import { cargarLogo, contextoInformes, nombreArchivoPdf, pdfGeneral, pdfPrograma, programasDe, zipInformes } from '../export/informesDatos.js';
+import { datosIndicadores, paginaIndicadores } from './indicadores.js';
+import { taxonomiasRA } from './taxonomias.js';
+import { calcularResumen, recomendacionesMatriz } from './resumenDatos.js';
 import { calcularFaltantes, estadoLote, modoPerfil } from '../perfil/lote.js';
 import { panelV1 } from './panelV1.js';
 
-const VARS = CRITERIOS.map(c => c[0]);
 const ICONO = { Cumple: '🟢 Cumple', Parcial: '🟡 Parcial', 'No cumple': '🔴 No cumple', 'Sin dato': '⚪ Sin dato' };
 const COLOR = { Cumple: '#1FB2DE', Parcial: '#FBAF17', 'No cumple': '#EC0677', 'Sin dato': '#8A94A0' };
-const local = { matriz: null, cfgCargando: false, autoV1: false };
+const local = { pestana: 'Resumen', matriz: null, cfgCargando: false, autoV1: false, exig: null, exigFirma: '', exigCargando: false, programa: null, pdf: { ocupado: false, mensaje: '' } };
 const fmt = v => (v === null || v === undefined ? '—' : `${v.toFixed(0)}%`);
 const miles = n => n.toLocaleString('es-CO');
-const COL_ASIG = 'Nombre asignatura o modulo';
+const PESTANAS = ['Resumen', 'Qué hacer y PDF', 'Detalle técnico'];
+const MIME_PDF = 'application/pdf';
 
-/** Port de recomendaciones_matriz (src/informes_pdf.py). */
-export function recomendacionesMatriz(estados, fila, nSinPerfil, nRaNoEval, nEstIncompletas) {
-  const malo = v => ['Parcial', 'No cumple'].includes(estados[v]);
-  const r = [];
-  if (malo('V1')) r.push(`V1 Perfil: revisar ${nSinPerfil} atributo(s) del perfil de egreso sin alineación; incorporarlos en competencias, RA o asignaturas, o ajustar la redacción del perfil.`);
-  if (malo('V2')) r.push(`V2 Coherencia: diferenciar el verbo repetido entre competencias específicas (${fila['Verbos repetidos'] || 'ver Paso 2'}).`);
-  if (malo('V3')) r.push(`V3 Evaluabilidad: reformular ${nRaNoEval} RA con verbo observable y finalidad de desempeño o producto.`);
-  if (malo('V4')) r.push(`V4 Trazabilidad: vincular ${fila['RA sin estrategia'] ?? 0} RA a una estrategia mesocurricular con instrumento en el Paso 4.`);
-  if (malo('V5')) r.push(`V5 Indicadores: completar indicador e instrumento en ${nEstIncompletas} estrategia(s) del Paso 4.`);
-  const niv = fila['Indicadores por nivel'] ?? {};
-  if (fila.Estrategias && !((niv.N3 ?? 0) + (niv.N4 ?? 0))) r.push('Evidencia (recomendación, sin criterio en la plantilla): ninguna estrategia declara indicadores de aprendizaje demostrado (N3) o transferencia (N4); conviene incluir al menos uno por estrategia.');
-  return r;
+/** Índice de exigencia por matriz (de Taxonomías), para la fila descriptiva de la valoración; se carga una vez y repinta al terminar. */
+function exigenciaPorMatriz(archivos, filas, todasFilas, rerender) {
+  const firma = archivos.map(a => a.huella ?? a.nombre).join('|');
+  if (local.exigFirma !== firma) { local.exigFirma = firma; local.exig = null; local.exigCargando = false; }
+  if (!local.exig && !local.exigCargando) {
+    local.exigCargando = true;
+    const programaDe = new Map(todasFilas.map(f => [f.Matriz, f.Programa]));
+    taxonomiasRA(archivos).then(ra => { local.exig = Object.fromEntries(porGrupo(ra.map(r => ({ ...r, Programa: programaDe.get(r.Matriz) ?? r.Programa })), 'Matriz').map(x => [x.Matriz, x['Índice de exigencia']])); })
+      .catch(() => { local.exig = {}; }).finally(() => { local.exigCargando = false; rerender(); });
+  }
+  return local.exig ?? {};
 }
 
-function asignaturasSinNucleos(filas) {
-  const s = new Set();
-  for (const f of filas) {
-    const a = f[COL_ASIG];
-    if (a == null || String(a).trim().toLowerCase().startsWith('electiv')) continue;
-    const n = f['Nucleos tematicos'];
-    if (n == null || ['', 'nan'].includes(String(n).trim())) s.add(String(a));
-  }
-  return s;
+/** Genera con el estado vigente y entrega la descarga; muestra «Generando…» mientras tanto. */
+async function generar(args, mensaje, hacer, rerender) {
+  if (local.pdf.ocupado) return;
+  local.pdf = { ocupado: true, mensaje }; rerender();
+  try {
+    await new Promise(r => setTimeout(r, 30));
+    const ctx = await contextoInformes(args);
+    const logo = await cargarLogo();
+    await hacer(ctx, logo);
+    local.pdf = { ocupado: false, mensaje: '' };
+  } catch (e) { local.pdf = { ocupado: false, mensaje: `No se pudo generar el informe: ${e?.message ?? e}` }; }
+  rerender();
 }
 
-function alertas(filas, etiqueta) {
-  const out = [];
-  const piv = new Map();
-  for (const f of filas) {
-    if (!['Saber', 'SaberHacer', 'SaberSer'].includes(f['Tipo de Saber'])) continue;
-    if (!piv.has(f.Matriz)) piv.set(f.Matriz, { Saber: 0, SaberHacer: 0, SaberSer: 0, n: 0 });
-    const o = piv.get(f.Matriz); o[f['Tipo de Saber']]++; o.n++;
-  }
-  if (piv.size >= 4) {
-    for (const t of ['Saber', 'SaberHacer', 'SaberSer']) {
-      const v = [...piv].map(([m, o]) => [m, 100 * o[t] / o.n]);
-      const q1 = cuantil(v.map(x => x[1]), 0.25), q3 = cuantil(v.map(x => x[1]), 0.75), med = mediana(v.map(x => x[1]));
-      for (const [m, p] of v) {
-        if (p < q1 - 1.5 * (q3 - q1) || p > q3 + 1.5 * (q3 - q1)) {
-          out.push({ Matriz: m, Categoría: 'Tipo de Saber', Hallazgo: `${etiqueta.get(m) ?? m}: ${t} ${p.toFixed(0)}% se aparta del conjunto cargado (mediana ${med.toFixed(0)}%; P25–P75 ${q1.toFixed(0)}–${q3.toFixed(0)}%)`,
-            Recomendación: 'Revisar si la diferencia responde a una decisión de diseño o a un error de diligenciamiento de la matriz.' });
-        }
-      }
-    }
-  }
-  const sinSem = filas.filter(f => f.Semestre == null || f.Semestre === '' || !Number.isFinite(Number(f.Semestre))).length;
-  if (sinSem) out.push({ Matriz: null, Categoría: 'Completitud de datos', Hallazgo: `${sinSem} de ${filas.length} registros (${(100 * sinSem / filas.length).toFixed(0)} %) sin semestre reconocible`,
-    Recomendación: 'Revisar el campo Semestre de esas asignaturas en el Paso 5 (valores vacíos o no numéricos).' });
-  const sinNuc = asignaturasSinNucleos(filas).size;
-  const nAsig = new Set(filas.map(f => f[COL_ASIG]).filter(x => x != null)).size;
-  if (sinNuc) out.push({ Matriz: null, Categoría: 'Completitud de datos', Hallazgo: `${sinNuc} asignaturas no electivas (${(100 * sinNuc / nAsig).toFixed(0)}%) sin núcleos temáticos declarados`,
-    Recomendación: 'Completar la columna «Núcleos temáticos» en el formato Excel para un análisis más preciso.' });
-  return out;
+function seccionPdf(args, matrices, rerender) {
+  const programas = [...new Set(args.filas.map(f => f.Programa))].sort();
+  if (!programas.includes(local.programa)) local.programa = programas[0] ?? null;
+  const ocupado = local.pdf.ocupado;
+  const boton = (texto, alClic, clase = 'boton') => h('button', { type: 'button', class: clase, disabled: ocupado ? true : null, onclick: alClic }, texto);
+  return h('div', {},
+    h('h3', {}, '📄 Informes en PDF'),
+    h('p', { class: 'leyenda' }, 'Se construyen al hacer clic con los archivos y filtros actuales; nada se guarda. Cada informe lleva portada, valoración V1–V5, acciones sugeridas, tipo de saber, tendencias, taxonomías y anexo con los elementos a revisar.'),
+    columnas(
+      h('div', {}, h('b', {}, 'Informe general'), h('p', { class: 'leyenda' }, 'Lectura rápida, V1–V5, valoración por criterios, matrices que requieren atención, hallazgos transversales, tendencias y perfil por programa.'),
+        boton('⬇️ Descargar informe general (PDF)', () => generar(args, 'Generando el informe general…', async (ctx, logo) => {
+          const pdf = pdfGeneral(ctx, logo);
+          if (pdf) descargar('informe_general_microcurricular.pdf', pdf, MIME_PDF);
+        }, rerender))),
+      h('div', {}, h('b', {}, 'Informe por programa'), h('p', { class: 'leyenda' }, 'Valoración de cada sede, acciones sugeridas, tipo de saber, tendencias y anexo con los atributos, RA y estrategias a revisar.'),
+        selector('Programa', programas, local.programa ?? '', v => { local.programa = v; rerender(); }),
+        local.programa ? boton(`⬇️ Descargar informe de ${local.programa} (PDF)`, () => generar(args, `Generando el informe de ${local.programa}…`, async (ctx, logo) => {
+          descargar(`informe_${nombreArchivoPdf(local.programa)}.pdf`, pdfPrograma(ctx, local.programa, logo), MIME_PDF);
+        }, rerender)) : null)),
+    h('p', {}, h('b', {}, 'Todos los programas'), ' ',
+      boton(`⬇️ Descargar informe general y ${programas.length} informes por programa (ZIP)`, () => generar(args, 'Generando los informes…', async (ctx, logo) => {
+        const zip = await zipInformes(ctx, logo, (i, n, nombre) => { local.pdf.mensaje = `Generando informe ${i + 1} de ${n}: ${nombre}`; rerender(); });
+        descargar('informes_microcurriculares.zip', zip, 'application/zip');
+      }, rerender))),
+    ocupado || local.pdf.mensaje ? aviso(ocupado ? 'info' : 'warning', local.pdf.mensaje) : null);
 }
 
 export function paginaResumen({ filas, todasFilas, archivos, archivoDe, etiqueta, seleccion, descripcionFiltros, rerender }) {
@@ -94,68 +95,20 @@ export function paginaResumen({ filas, todasFilas, archivos, archivoDe, etiqueta
   // mientras se calcula el perfil solo se muestra el avance: redibujar tablas y gráficos en cada paso saturaría el navegador
   if (lote.corriendo) return h('div', {}, ...cab, panelV1({ archivoDe, faltan: d.faltanPerfil, rerender }));
 
-  const vis = new Set(filas.map(f => f.Matriz));
-  const evalVista = d.matrices.filter(m => vis.has(m.matriz) && (!seleccion || m.matriz === seleccion));
-  const todo = agregar(d.matrices, d.v1);
-  const vista = agregar(evalVista, d.v1);
-  const g = vista.globales;
-  const ref = referenciasConjunto(todo.por_matriz);
-  const filasVista = seleccion ? filas.filter(f => f.Matriz === seleccion) : filas;
-  if (!g.matrices) return h('div', {}, ...cab, aviso('warning', 'Ninguna matriz de la vista tiene los Pasos 2, 3 y 4 legibles.'));
-
-  const val = Object.fromEntries(vista.por_matriz.map(m => [m.Matriz, valorarMatriz(m, { sinRespaldo: d.perfil[m.Matriz]?.sin ?? null, tresCapas: d.perfil[m.Matriz]?.tres ?? null, referencia: ref })]));
-  const prioridades = vista.por_matriz.map(m => {
-    const est = Object.fromEntries(val[m.Matriz].map(v => [v.Variable, v.Estado]));
-    return { Matriz: m.Matriz, Etiqueta: etiqueta.get(m.Matriz) ?? m.Matriz, ...Object.fromEntries(VARS.map(v => [v, est[v] ?? 'Sin dato'])),
-      'No cumple': VARS.filter(v => est[v] === 'No cumple').length, Parcial: VARS.filter(v => est[v] === 'Parcial').length };
-  }).sort((a, b) => b['No cumple'] - a['No cumple'] || b.Parcial - a.Parcial || cmp(a.Etiqueta, b.Etiqueta));
-  const conteo = CRITERIOS.map(([v, e]) => [`${v} ${e}`, v, Object.fromEntries(['Cumple', 'Parcial', 'No cumple', 'Sin dato'].map(s => [s, prioridades.filter(p => p[v] === s).length]))]);
-
-  // lectura rápida (hechos, sin umbrales)
-  const lectura = [];
-  if (prioridades.length) {
-    const n = prioridades.length, conNC = prioridades.filter(p => p['No cumple'] > 0).length, todas = prioridades.filter(p => VARS.every(v => p[v] === 'Cumple')).length;
-    lectura.push(`<b>${conNC} de ${n}</b> matrices tienen al menos un criterio en «No cumple»; <b>${todas}</b> ${todas === 1 ? 'cumple' : 'cumplen'} los cinco criterios.`);
-    const peor = [...conteo].sort((a, b) => b[2]['No cumple'] - a[2]['No cumple'])[0];
-    if (peor[2]['No cumple']) lectura.push(`El criterio con más incumplimiento es <b>${peor[0]}</b> (${peor[2]['No cumple']} matrices en «No cumple», ${peor[2].Parcial} en «Parcial»).`);
-    const cumplidos = conteo.filter(c => c[2].Cumple === n).map(c => c[0]);
-    if (cumplidos.length) lectura.push(`Todas las matrices cumplen: <b>${cumplidos.join(', ')}</b>.`);
-  }
-  const nSinAl = Object.entries(d.perfil).filter(([m]) => vis.has(m) && (!seleccion || m === seleccion)).reduce((a, [, p]) => [a[0] + p.nSin, a[1] + p.n], [0, 0]);
-  if (nSinAl[1]) lectura.push(`Perfil de egreso: <b>${nSinAl[0]} de ${nSinAl[1]}</b> atributos (${(100 * nSinAl[0] / nSinAl[1]).toFixed(0)} %) sin alineación en ninguna capa (competencias, RA o asignaturas).`);
-  if (g.ra_unicos) lectura.push(`De <b>${g.ra_unicos}</b> RA únicos, <b>${g.ra_sin_estrategia}</b> no tienen estrategia mesocurricular con instrumento (V4) y <b>${vista.ra.filter(r => !r.V3).length}</b> no son evaluables (V3).`);
-  if (g.estrategias) lectura.push(`<b>${g.estrategias_directa} de ${g.estrategias}</b> estrategias declaran indicadores de aprendizaje demostrado o transferencia (N3–N4).`);
-
-  // tendencias
-  let tend = null;
-  if (hayConfig()) {
-    const T = configActual().TENDENCIAS_GLOBALES, acier = aciertosPorFila(todasFilas), r = resumirTendencias(filasVista, acier);
-    const progs = new Set(filasVista.map(f => f.Programa));
-    tend = Object.keys(T).map(t => {
-      const ps = new Set(filasVista.filter(f => acier.get(f)?.[t]).map(f => f.Programa));
-      return { Tendencia: T[t].descripcion, Asignaturas: r.conteo[t], '% de asignaturas': +r.cobertura[t].toFixed(1), Programas: ps.size, '% de programas': progs.size ? +(100 * ps.size / progs.size).toFixed(1) : 0 };
-    }).sort((a, b) => a['% de asignaturas'] - b['% de asignaturas'] || a.Programas - b.Programas);
-    const ausentes = tend.filter(t => t.Asignaturas === 0).map(t => t.Tendencia);
-    if (ausentes.length) lectura.push(`Tendencias globales sin presencia: ${ausentes.join(', ')}.`);
-  }
-
-  const kpis = [['Programas', new Set(filasVista.map(f => f.Programa)).size], ['Matrices', new Set(filasVista.map(f => f.Matriz)).size],
-    ['Asignaturas', new Set(filasVista.map(f => f[COL_ASIG]).filter(x => x != null)).size], ['RA únicos', g.ra_unicos ?? 0], ['Estrategias (Paso 4)', g.estrategias ?? 0]];
-  const al = alertas(filasVista, etiqueta).filter(a => !seleccion || !a.Matriz || a.Matriz === seleccion);
+  const R = calcularResumen({ filas, todasFilas, d, etiqueta, seleccion, exigencia: exigenciaPorMatriz(archivos, filas, todasFilas, rerender) });
+  if (R.vacio) return h('div', {}, ...cab, aviso('warning', 'Ninguna matriz de la vista tiene los Pasos 2, 3 y 4 legibles.'));
+  const { vista, g, ref, val, prioridades, conteo, lectura, tend, kpis, al } = R;
 
   const matricesVista = prioridades.map(p => p.Matriz);
   if (!matricesVista.includes(local.matriz)) local.matriz = matricesVista[0] ?? null;
   const sel = seleccion ?? local.matriz;
 
-  return h('div', {}, ...cab,
-    seleccion ? aviso('info', `<b>Vista de matriz:</b> ${etiqueta.get(seleccion)}. Las medianas de referencia son las de las ${ref.n} matrices cargadas.`) : h('p', { class: 'leyenda' }, descripcionFiltros),
-    panelV1({ archivoDe, faltan: d.faltanPerfil, rerender }),
-    ...d.errores.map(e => aviso('warning', `❌ <b>${e.archivo}</b>: ${e.causa}`)),
+  const resumen = h('div', {},
     columnas(...kpis.map(([e, v]) => metrica(e, miles(v)))),
     lectura.length ? h('div', {}, h('h3', {}, '🔎 Lectura rápida'), h('ul', {}, ...lectura.map(l => h('li', { html: l })))) : null,
     h('hr'),
     h('h3', {}, '📐 Coherencia y trazabilidad curricular (V1–V5)'),
-    columnas(metrica('V1 Perfil', fmt(g.V1), `${g.atributos_perfil} atributos evaluables del perfil.`), metrica('V2 Coherencia', fmt(g.V2), `${g.matrices_con_repeticion} matriz(ces) con verbo repetido.`),
+    columnas(metrica('V1 Perfil', fmt(g.V1), `${g.atributos_perfil} atributos evaluables del perfil.`), metrica('V2 Coherencia', fmt(g.V2), `${g.matrices_con_repeticion} matriz(ces) con verbo repetido (informativo; no se califica).`),
       metrica('V3 Evaluabilidad', fmt(g.V3), `${g.ra_unicos} RA únicos.`), metrica('V4 Trazabilidad', fmt(g.V4), `Sin el RA genérico: ${fmt(g.V4_programa)}.`),
       metrica('V5 Evidencia (N2+)', fmt(g.V5), `${g.estrategias} estrategias.`)),
     h('p', { class: 'leyenda' }, 'Valoración por criterios: número de matrices en cada estado. Cumple = la regla de la plantilla se cumple en todos los casos; Parcial = en algunos; No cumple = en ninguno.'),
@@ -174,19 +127,30 @@ export function paginaResumen({ filas, todasFilas, archivos, archivoDe, etiqueta
       XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(lectura.map(l => ({ 'Lectura rápida': l.replace(/<[^>]+>/g, '') }))), 'Lectura');
       descargar('resumen_ejecutivo.xlsx', XLSX.write(wb, { bookType: 'xlsx', type: 'array' }), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     }), ' ',
-    botonDescarga('Imprimir o guardar como PDF', () => window.print()),
     h('hr'),
     h('h3', {}, '⚠️ Hallazgos transversales'),
     al.length ? h('div', {}, ...al.map(a => h('details', {}, h('summary', {}, `🟡 ${a.Categoría}: ${a.Hallazgo}`), h('p', {}, h('b', {}, '💡 Recomendación: '), a.Recomendación))))
       : aviso('success', '✅ Sin alertas de tipo de saber ni de completitud de datos.'),
     tend ? h('details', {}, h('summary', {}, `💡 Presencia de las ${tend.length} tendencias globales, de menor a mayor`),
       h('p', { class: 'leyenda' }, 'No existe un mínimo institucional de cobertura, por lo que ninguna tendencia se califica como baja. La tabla las ordena para que el comité decida cuáles reforzar.'),
-      tabla(tend, Object.keys(tend[0]).map(c => ({ title: c, field: c, ...(c === 'Tendencia' ? { minWidth: 240 } : { hozAlign: 'right' }) })), { height: false })) : null,
+      tabla(tend, Object.keys(tend[0]).map(c => ({ title: c, field: c, ...(c === 'Tendencia' ? { minWidth: 240 } : { hozAlign: 'right' }) })), { height: false })) : null);
+  const accionesPdf = h('div', {},
+    seccionPdf({ filas, todasFilas, d, etiqueta, archivoDe, archivos, descripcionFiltros }, matricesVista, rerender),
     h('hr'),
     h('h3', {}, '🛠️ Qué hacer en cada matriz'),
     seleccion ? null : selector('Matriz', matricesVista.map(m => etiqueta.get(m) ?? m), etiqueta.get(sel) ?? '',
       v => { local.matriz = matricesVista.find(m => (etiqueta.get(m) ?? m) === v); rerender(); }),
     sel ? vistaAcciones({ sel, vista, val, d, etiqueta }) : null);
+
+  const detalle = local.pestana === 'Detalle técnico'
+    ? paginaIndicadores({ filas, archivos, archivoDe, etiqueta, seleccion, rerender, incrustada: true }) : null;
+  const cuerpo = local.pestana === 'Qué hacer y PDF' ? accionesPdf : local.pestana === 'Detalle técnico' ? detalle : resumen;
+  return h('div', {}, ...cab,
+    seleccion ? aviso('info', `<b>Vista de matriz:</b> ${etiqueta.get(seleccion)}. Las medianas de referencia son las de las ${ref.n} matrices cargadas.`) : h('p', { class: 'leyenda' }, descripcionFiltros),
+    panelV1({ archivoDe, faltan: d.faltanPerfil, rerender }),
+    ...d.errores.map(e => aviso('warning', `❌ <b>${e.archivo}</b>: ${e.causa}`)),
+    h('div', { class: 'pestanas' }, ...PESTANAS.map(n => h('button', { type: 'button', class: n === local.pestana ? 'activa' : '', onclick: () => { local.pestana = n; rerender(); } }, n))),
+    cuerpo);
 }
 
 function vistaAcciones({ sel, vista, val, d, etiqueta }) {

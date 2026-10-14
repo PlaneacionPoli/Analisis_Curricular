@@ -2,6 +2,7 @@
 import * as XLSX from 'xlsx';
 import { aciertosPorFila, cargarConfig, configActual, guardarConfig as guardar, hayConfig, resumirTendencias, restaurarConfig as restaurar, validarImportacion } from '../data/tendencias.js';
 import { cmp } from '../data/util.js';
+import { libroListado } from '../export/excelListado.js';
 import { aviso, botonDescarga, columnas, descargar, grafico, h, info, metrica, selector, tabla, titulo } from '../ui.js';
 
 const local = { pestana: 'Vista global', tendencia: null, tendenciaMatriz: null, matriz: null, cargando: false };
@@ -74,19 +75,14 @@ function detalleTendencia(res, T, etiqueta, tid, filasVista, filtroMatriz) {
   return h('div', {}, ...cuerpo);
 }
 
-function excelTendencia(res, T, etiqueta, tid) {
-  const filas = [];
-  for (const [i, hs] of res.detalle[tid]) {
-    const m = new Map();
-    for (const hz of hs) {
-      if (hz.asignatura === 'Sin nombre') continue;
-      if (!m.has(hz.asignatura)) m.set(hz.asignatura, { kws: new Set(), campos: new Set() });
-      hz.keywords.forEach(k => m.get(hz.asignatura).kws.add(k)); hz.campos.forEach(c => m.get(hz.asignatura).campos.add(c));
-    }
-    for (const [a, o] of m) filas.push({ Matriz: etiqueta.get(i), Asignatura: a, 'Términos identificados': [...o.kws].sort().join('; '), 'Campos detectados': [...o.campos].join('; ') });
-  }
-  filas.sort((a, b) => cmp(a.Matriz, b.Matriz) || cmp(a.Asignatura, b.Asignatura));
-  descargarLibro(`listado_${tid}.xlsx`, [['Asignaturas', filas], ['Matrices', [...new Set(filas.map(f => f.Matriz))].map(Matriz => ({ Matriz }))]]);
+async function excelTendencia(res, T, vista, tid) {
+  const programaDe = new Map(vista.map(f => [f.Matriz, f.Programa]));
+  // filas del Paso 5 de las asignaturas que abordan la tendencia (mismos pares programa-asignatura que el mapa de calor)
+  const pares = new Set();
+  for (const [m, hs] of res.detalle[tid]) for (const hz of hs) if (hz.asignatura !== 'Sin nombre') pares.add(`${programaDe.get(m)}|${hz.asignatura}`);
+  const filas = vista.filter(f => pares.has(`${f.Programa}|${String(f['Nombre asignatura o modulo']).trim()}`));
+  const buf = await libroListado({ filas, detalle: res.detalle[tid], programaDe, tendenciaNombre: T[tid].descripcion.slice(0, 30) });
+  descargar(`listado_${tid}.xlsx`, buf, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 }
 
 /**
@@ -134,7 +130,7 @@ export function paginaTendencias({ todas, filas, etiqueta, seleccion, rerender }
     selector('Seleccionar tendencia:', tids.map(t => T[t].descripcion), T[local.tendencia].descripcion,
       v => { local.tendencia = tids.find(t => T[t].descripcion === v); rerender(); }),
     h('p', {}, h('b', {}, T[local.tendencia].descripcion), ` — presente en <b>${res.conteo[local.tendencia]} de ${res.total}</b> asignaturas (${res.cobertura[local.tendencia].toFixed(0)} % de cobertura)`.replace(/<\/?b>/g, '')),
-    botonDescarga('Descargar Excel', () => excelTendencia(res, T, etiqueta, local.tendencia)),
+    botonDescarga('📥 Descargar Excel', () => excelTendencia(res, T, vista, local.tendencia)),
     detalleTendencia(res, T, etiqueta, local.tendencia));
 
   // vista «por matriz»

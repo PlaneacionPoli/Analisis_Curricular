@@ -183,7 +183,7 @@ function vistaMatriz(filas, todasFilas, seleccion, etiqueta, datos) {
           { type: 'scatter', mode: 'markers', name: 'Mediana del conjunto', y: TIPOS, x: TIPOS.map(t => +med[t]?.toFixed(1)), marker: { symbol: 'diamond', size: 13, color: '#FBAF17', line: { width: 1.5, color: '#0F385A' } } },
         ], { height: 280, xaxis: { range: [0, 100], ticksuffix: ' %' }, yaxis: { autorange: 'reversed' }, margin: { l: 90, r: 20, t: 10, b: 40 }, legend: { orientation: 'h', y: -0.2 } })),
       panel({ titulo: 'Siguiente paso', bajada: 'Profundiza en esta matriz.' },
-        h('div', { class: 'accesos' }, ...[['Indicadores V1–V5', 'speedometer2'], ['Perfil de Egreso (V1)', 'person-check'], ['Resumen Ejecutivo', 'clipboard-data'], ['Cobertura Temática', 'map']].map(([n, ic]) =>
+        h('div', { class: 'accesos' }, ...[['Resumen Ejecutivo', 'clipboard-data'], ['Perfil de Egreso (V1)', 'person-check'], ['Tipo de Saber', 'bar-chart'], ['Cobertura Temática', 'map']].map(([n, ic]) =>
           h('button', { type: 'button', class: 'acceso', onclick: () => { actualizar({ pagina: n }); window.scrollTo(0, 0); } }, icono(ic), n, icono('arrow-right')))))),
     tablaResumen(mias, datos.columnas, datos.totales));
 }

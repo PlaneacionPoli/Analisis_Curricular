@@ -1,7 +1,7 @@
-// Página «Indicadores V1–V5»: ruta de alineación, valoración por criterios, trazabilidad, niveles de evidencia y contrastes.
+// Página «Indicadores V1–V5»: ruta de alineación, valoración por criterios, trazabilidad, niveles de evidencia.
 // Conjunto = lo que reporta el artículo; matriz = una unidad programa-sede frente a la mediana de TODAS las matrices cargadas.
 import * as XLSX from 'xlsx';
-import { agregar, calcularIndicadores, CRITERIOS, contrastes, ESTADOS_CRITERIO, NIVELES, referenciasConjunto, valorarMatriz } from '../data/indicadores.js';
+import { agregar, calcularIndicadores, CRITERIOS_EVALUADOS as CRITERIOS, ESTADOS_CRITERIO, NIVELES, referenciasConjunto, valorarMatriz } from '../data/indicadores.js';
 import { mediana } from '../data/estadistica.js';
 import { cmp } from '../data/util.js';
 import { perfilEnCache } from '../perfil/servicio.js';
@@ -116,15 +116,13 @@ function tablaSimple(filas, cols, altura = false) {
     : h('p', { class: 'leyenda' }, 'Sin registros.');
 }
 
-function excel(res, ct) {
+function excel(res) {
   const wb = XLSX.utils.book_new();
   const hoja = (n, f) => XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(f), n);
   hoja('Por_matriz', res.por_matriz.map(m => ({ ...m, 'Indicadores por nivel': JSON.stringify(m['Indicadores por nivel']) })));
   hoja('RA', res.ra);
   hoja('Estrategias', res.estrategias.map(({ niveles, ...e }) => e));
   hoja('Indicadores_P4', res.indicadores);
-  hoja('Spearman', ct.spearman);
-  hoja('Kruskal', ct.kruskal);
   descargar('indicadores_v1_v5.xlsx', XLSX.write(wb, { bookType: 'xlsx', type: 'array' }), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 }
 
@@ -132,14 +130,14 @@ function metricas(g) {
   return columnas(
     metrica('Matrices / programas', `${g.matrices} / ${g.programas}`),
     metrica('V1 Perfil', fmt(g.V1), g.V1 === null ? 'Calcula el perfil en «Perfil de Egreso (V1)» para ver V1.' : `${g.atributos_perfil} atributos evaluables del perfil.`),
-    metrica('V2 Coherencia', fmt(g.V2), `${g.matrices_con_repeticion} matriz(ces) con verbo repetido.`),
+    metrica('V2 Coherencia', fmt(g.V2), `${g.matrices_con_repeticion} matriz(ces) con verbo repetido (informativo; no se califica).`),
     metrica('V3 Evaluabilidad', fmt(g.V3), `${g.ra_unicos} RA únicos.`),
     metrica('V4 Trazabilidad', fmt(g.V4), `Sin el RA genérico: ${fmt(g.V4_programa)}.`),
     metrica('V5 Evidencia (N2+)', fmt(g.V5), `Evidencia directa (N3–N4, descriptiva): ${g.estrategias_directa} de ${g.estrategias} estrategias (${fmt(g.evidencia_directa)}).`));
 }
 
-export function paginaIndicadores({ filas, archivos, archivoDe, etiqueta, seleccion, rerender }) {
-  const cab = [...titulo('Indicadores de Coherencia y Trazabilidad (V1–V5)'),
+export function paginaIndicadores({ filas, archivos, archivoDe, etiqueta, seleccion, rerender, incrustada = false }) {
+  const cab = incrustada ? [] : [...titulo('Indicadores de Coherencia y Trazabilidad (V1–V5)'),
     info('<b>V1</b> Correspondencia del perfil: atributos respaldados en competencias, RA y asignaturas. <b>V2</b> Coherencia horizontal: matriz sin verbo repetido entre competencias ' +
       'específicas (no cuenta la genérica institucional). <b>V3</b> Evaluabilidad: RA con verbo observable y finalidad de desempeño. <b>V4</b> Trazabilidad: RA únicos con estrategia ' +
       'mesocurricular que declara instrumento (Paso 4). <b>V5</b> Evidencia del logro: estrategias cuyo indicador de mayor nivel supera la mera implementación (N2 o superior). ' +
@@ -160,7 +158,7 @@ export function paginaIndicadores({ filas, archivos, archivoDe, etiqueta, selecc
   const todo = agregar(matrices, local.v1);                // referencia: siempre el conjunto cargado
   const vista = agregar(seleccion ? evalVista.filter(m => m.matriz === seleccion) : evalVista, local.v1);
   const ref = referenciasConjunto(todo.por_matriz);
-  const avisos = [
+  const avisos = incrustada ? [] : [
     ...errores.map(e => aviso('warning', `❌ <b>${e.archivo}</b>: ${e.causa}`)),
     panelV1({ archivoDe, faltan: [...archivoDe].filter(([id, a]) => a && !local.enCache.has(id)).length, rerender }),
   ];
@@ -170,9 +168,8 @@ export function paginaIndicadores({ filas, archivos, archivoDe, etiqueta, selecc
   g.estInd = vista.estrategias.filter(e => e.indicadores > 0 && e.instrumento).length;
   const gTodo = todo.globales; gTodo.estInd = todo.estrategias.filter(e => e.indicadores > 0 && e.instrumento).length;
   const val = Object.fromEntries(todo.por_matriz.map(m => [m.Matriz, valorarMatriz(m, { sinRespaldo: local.perfil[m.Matriz]?.sin ?? null, tresCapas: local.perfil[m.Matriz]?.tres ?? null, referencia: ref })]));
-  const ct = contrastes(vista.por_matriz);
 
-  if (seleccion) return h('div', {}, ...cab, ...avisos, vistaMatriz({ g, vista, todo, ref, val, seleccion, etiqueta, rerender }));
+  if (seleccion) return h('div', {}, ...cab, ...avisos, vistaMatriz({ g, vista, todo, ref, val, seleccion, etiqueta, rerender, incrustada }));
 
   const sinEst = vista.ra.filter(r => !r.V4 && !r.generica).map(r => ({ Matriz: etiqueta.get(r.matriz) ?? r.matriz, RA: r.ra }));
   const clases = ['RA genérico institucional', 'RA de programa'].map((c, i) => {
@@ -183,13 +180,13 @@ export function paginaIndicadores({ filas, archivos, archivoDe, etiqueta, selecc
   const totalNiv = niv.reduce((s, x) => s + x[1], 0);
   const valVista = Object.fromEntries(Object.entries(val).filter(([k]) => vis.has(k)));
 
-  return h('div', {}, ...cab, ...avisos, metricas(g),
+  return h('div', {}, ...cab, ...avisos, incrustada ? null : metricas(g),
     h('h3', {}, 'Ruta de alineación curricular'),
     h('p', { class: 'leyenda' }, 'Cada tramo se calcula sobre su propia base. Gris: condición que impone la plantilla; azul: articulación. El nivel de evidencia de los indicadores (V5) no es un tramo de la ruta y se muestra más abajo.'),
     ruta(g),
     h('h3', {}, 'Valoración por criterios'),
     h('p', { class: 'leyenda' }, 'Cada tramo se compara con la regla que exige la plantilla. Cumple: en todos los casos; Parcial: en algunos; No cumple: en ninguno. No hay puntaje compuesto ni pesos; la mediana del conjunto solo sitúa a cada matriz.'),
-    figValoracion(valVista),
+    incrustada ? null : figValoracion(valVista),
     selector('Ver la valoración de una matriz', Object.keys(valVista).map(k => etiqueta.get(k) ?? k), etiqueta.get(local.matrizVal) ?? etiqueta.get(Object.keys(valVista)[0]) ?? '',
       v => { local.matrizVal = Object.keys(valVista).find(k => (etiqueta.get(k) ?? k) === v); rerender(); }),
     valVista[local.matrizVal ?? Object.keys(valVista)[0]] ? tablaValoracion(valVista[local.matrizVal ?? Object.keys(valVista)[0]]) : null,
@@ -203,16 +200,10 @@ export function paginaIndicadores({ filas, archivos, archivoDe, etiqueta, selecc
         tablaSimple(niv.map(([Nivel, Indicadores]) => ({ Nivel, Indicadores, '%': Math.round(1000 * Indicadores / totalNiv) / 10 }))),
         h('p', { class: 'leyenda' }, 'N1 implementación · N2 percepción · N3 aprendizaje demostrado · N4 transferencia · N5 efecto externo.'))),
     h('hr'),
-    h('h3', {}, 'Asociación entre variables (R6) y diferencias entre sedes (R7)'),
-    ...ct.motivos.map(m => h('p', { class: 'leyenda' }, `ℹ️ ${m}`)),
-    columnas(
-      h('div', {}, h('b', {}, 'Correlación de Spearman (por matriz)'), ct.spearman.length ? tablaSimple(ct.spearman) : h('p', { class: 'leyenda' }, 'No hay pares estimables con el conjunto cargado.')),
-      h('div', {}, h('b', {}, 'Kruskal-Wallis entre sedes'), ct.kruskal.length ? tablaSimple(ct.kruskal) : h('p', { class: 'leyenda' }, 'No hay contrastes estimables con el conjunto cargado.'))),
-    h('p', { class: 'leyenda' }, 'Contrastes exploratorios: las matrices de un mismo programa en varias sedes no son independientes; la no significación indica ausencia de evidencia de diferencia, no equivalencia.'),
-    botonDescarga('Descargar indicadores V1–V5 (Excel)', () => excel(vista, ct)));
+    botonDescarga('Descargar indicadores V1–V5 (Excel)', () => excel(vista)));
 }
 
-function vistaMatriz({ g, vista, todo, ref, val, seleccion, etiqueta }) {
+function vistaMatriz({ g, vista, todo, ref, val, seleccion, etiqueta, incrustada }) {
   const m = vista.por_matriz[0];
   const valM = val[seleccion];
   const med = {
@@ -227,7 +218,7 @@ function vistaMatriz({ g, vista, todo, ref, val, seleccion, etiqueta }) {
   return h('div', {},
     aviso('info', `<b>Vista de matriz:</b> ${etiqueta.get(seleccion)}. El rombo dorado es la mediana de las ${ref.n} matrices cargadas. Las correlaciones y las diferencias entre sedes no existen para una sola matriz: aquí se muestra su posición frente a la mediana.`),
     gemelas.length ? aviso('warning', `Misma matriz en otras sedes: ${gemelas.map(x => etiqueta.get(x) ?? x).join('; ')}. Comparten RA y núcleos casi idénticos: no se comparan como hallazgo.`) : null,
-    metricas(g),
+    incrustada ? null : metricas(g),
     h('p', { class: 'leyenda' }, `Frente a la mediana — V1: ${pos(m['V1 %'], ref['V1 %'])} · V3: ${pos(m['V3 %'], ref['V3 %'])} · V4: ${pos(m['V4 %'], ref['V4 %'])} · V5: ${pos(m['V5 %'], ref['V5 %'])}.`),
     h('h3', {}, 'Ruta de alineación de la matriz'), ruta(g, med),
     h('h3', {}, 'Valoración por criterios'), tablaValoracion(valM),

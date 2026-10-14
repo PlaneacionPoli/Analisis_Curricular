@@ -230,23 +230,28 @@ export const CRITERIOS = [
   ['V4', 'Trazabilidad de los RA', 'Todo RA vinculado a una estrategia mesocurricular con instrumento'],
   ['V5', 'Indicadores de las estrategias', 'Cada estrategia declara al menos un indicador y un instrumento (Paso 4)'],
 ];
+/** V2 (verbos repetidos entre competencias) se informa pero no se califica: la plantilla no prohíbe repetir verbos. */
+export const DESCRIPTIVOS = new Set(['V2']);
+export const CRITERIOS_EVALUADOS = CRITERIOS.filter(c => !DESCRIPTIVOS.has(c[0]));
 export const ESTADOS_CRITERIO = ['Cumple', 'Parcial', 'No cumple'];
 export const estadoCriterio = p => (p === null || p === undefined ? 'Sin dato' : p >= 100 ? 'Cumple' : p <= 0 ? 'No cumple' : 'Parcial');
 
-export function referenciasConjunto(porMatriz) {
+export function referenciasConjunto(porMatriz, exigencia = {}) {
   const ref = {};
   for (const v of ['V1 %', 'V3 %', 'V4 %', 'V5 %']) {
     const xs = porMatriz.map(m => m[v]).filter(x => x !== null && x !== undefined);
     ref[v] = xs.length ? redondear(mediana(xs), 1) : null;
   }
   ref.V2 = porMatriz.length ? redondear(100 * porMatriz.filter(m => m.V2 === 'Sí').length / porMatriz.length, 1) : null;
+  const ex = Object.values(exigencia).filter(x => x !== null && x !== undefined);
+  ref.exigencia = ex.length ? redondear(mediana(ex), 1) : null;
   ref.n = porMatriz.length;
   return ref;
 }
 
 const fmtPct = x => (x === null || x === undefined ? '—' : `${x.toFixed(0)} %`.replace('.', ','));
 
-export function valorarMatriz(fila, { sinRespaldo = null, tresCapas = null, referencia = {} } = {}) {
+export function valorarMatriz(fila, { sinRespaldo = null, tresCapas = null, referencia = {}, exigencia = null } = {}) {
   const nRA = fila['RA únicos'] || 0, nEst = fila.Estrategias || 0;
   const resultado = {
     V1: [fila['V1 %'], `${fmtPct(fila['V1 %'])} con alguna alineación` + (sinRespaldo !== null ? `; ${fmtPct(sinRespaldo)} sin alineación` : '') + (tresCapas !== null ? `; ${fmtPct(tresCapas)} con las tres capas` : '')],
@@ -257,6 +262,19 @@ export function valorarMatriz(fila, { sinRespaldo = null, tresCapas = null, refe
   };
   const refs = { V1: fmtPct(referencia['V1 %']), V2: referencia.V2 !== null && referencia.V2 !== undefined ? `${fmtPct(referencia.V2)} de las matrices cumple` : '—',
     V3: fmtPct(referencia['V3 %']), V4: fmtPct(referencia['V4 %']), V5: '—' };
-  return CRITERIOS.map(([v, tramo, criterio]) => ({ Variable: v, Tramo: tramo, Criterio: criterio, Resultado: resultado[v][1], Valor: resultado[v][0],
-    Estado: estadoCriterio(resultado[v][0]), 'Referencia (mediana)': refs[v] }));
+  const filas = CRITERIOS.map(([v, tramo, criterio]) => ({ Variable: v, Tramo: tramo, Criterio: criterio, Resultado: resultado[v][1], Valor: resultado[v][0],
+    Estado: DESCRIPTIVOS.has(v) ? 'Descriptiva' : estadoCriterio(resultado[v][0]), 'Referencia (mediana)': refs[v] }));
+  // filas descriptivas (sin criterio en la plantilla), como valorar_matriz de Python
+  const niv = fila['Indicadores por nivel'] ?? {};
+  const nInd = Object.values(niv).reduce((a, b) => a + b, 0);
+  const directas = Math.round((fila['Evidencia directa %'] || 0) * nEst / 100);
+  const coma = x => String(x).replace('.', ',');
+  filas.push({ Variable: '—', Tramo: 'Nivel de evidencia de los indicadores (descriptivo)',
+    Criterio: 'Sin criterio en la plantilla. Recomendación: al menos un indicador de aprendizaje demostrado (N3) por estrategia',
+    Resultado: nInd ? `${nInd} indicadores: N1 implementación ${niv.N1 ?? 0}, N2 percepción ${niv.N2 ?? 0}, N3–N4 aprendizaje ${(niv.N3 ?? 0) + (niv.N4 ?? 0)}, N5 efecto externo ${niv.N5 ?? 0}; V5 (N2 o superior) ${fmtPct(fila['V5 %'])}; ${directas} de ${nEst} estrategias con N3–N4` : '—',
+    Valor: null, Estado: 'Descriptiva', 'Referencia (mediana)': referencia['V5 %'] !== null && referencia['V5 %'] !== undefined ? `${fmtPct(referencia['V5 %'])} de estrategias con N2 o superior` : '—' });
+  filas.push({ Variable: '—', Tramo: 'Exigencia de los RA (descriptiva)', Criterio: 'Sin criterio: la exigencia adecuada depende del nivel de formación',
+    Resultado: exigencia === null || exigencia === undefined ? '—' : `índice ${coma(exigencia.toFixed(1))}`, Valor: null, Estado: 'Descriptiva',
+    'Referencia (mediana)': referencia.exigencia === null || referencia.exigencia === undefined ? '—' : coma(referencia.exigencia.toFixed(1)) });
+  return filas;
 }

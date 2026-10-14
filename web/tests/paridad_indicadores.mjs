@@ -33,7 +33,8 @@ igual('contrastes (Spearman, Kruskal, motivos)', contrastes(js.por_matriz), g.co
 const ref = referenciasConjunto(js.por_matriz);
 igual('referencias del conjunto', ref, Object.fromEntries(Object.keys(ref).map(k => [k, g.referencias[k]])));
 const val = Object.fromEntries(js.por_matriz.map(m => [m.Matriz, valorarMatriz(m, { referencia: ref }).map(({ Valor, ...r }) => r)]));
-const valPy = Object.fromEntries(Object.entries(g.valoracion).map(([k, v]) => [k, v.filter(x => x.Variable !== '—')]));
+// V2 se informa sin calificar en la web (decisión posterior a la versión de Python)
+const valPy = Object.fromEntries(Object.entries(g.valoracion).map(([k, v]) => [k, v.map(x => (x.Variable === 'V2' ? { ...x, Estado: 'Descriptiva' } : x))]));
 const ord = o => Object.fromEntries(Object.keys(o).sort().map(k => [k, o[k]]));
 igual('valoración por criterios', ord(val), ord(valPy));
 if (process.env.DEPURAR) {
