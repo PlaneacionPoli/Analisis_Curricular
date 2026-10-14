@@ -4,9 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "predev": "node scripts/copiar_wasm.mjs",
+    "predev": "node tools/copiar_wasm.mjs",
     "dev": "vite",
-    "prebuild": "node scripts/copiar_wasm.mjs",
+    "prebuild": "node tools/copiar_wasm.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "test": "node tests/paridad.mjs"

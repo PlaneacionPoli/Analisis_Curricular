@@ -12,7 +12,7 @@ const LOTE = 32;
  */
 export async function crearIncrustador({ nodo = false, dtype = null, alProgreso = null, wasmBase = null } = {}) {
   if (!nodo) env.allowLocalModels = false;
-  // motor WASM servido por el propio sitio (scripts/copiar_wasm.mjs); sin esto se descarga de un CDN
+  // motor WASM servido por el propio sitio (tools/copiar_wasm.mjs); sin esto se descarga de un CDN
   if (!nodo && wasmBase) env.backends.onnx.wasm.wasmPaths = wasmBase;
   const extractor = await pipeline('feature-extraction', MODELO, {
     dtype: dtype ?? 'q8',

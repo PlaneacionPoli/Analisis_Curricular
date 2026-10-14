@@ -31,7 +31,7 @@ No agregar `custom_headers` de aislamiento (COOP/COEP): bloquearía la descarga 
 | Elemento | Origen | Tamaño |
 |---|---|---|
 | Aplicación (JS, CSS, datos) | el propio Space | ≈ 7,6 MB |
-| Motor WASM de onnxruntime (`public/ort/`) | el propio Space; lo copia `scripts/copiar_wasm.mjs` antes de `dev` y `build` | 21,6 MB, solo si se usa el modelo |
+| Motor WASM de onnxruntime (`public/ort/`) | el propio Space; lo copia `tools/copiar_wasm.mjs` antes de `dev` y `build` | 21,6 MB, solo si se usa el modelo |
 | Modelo `Xenova/paraphrase-multilingual-MiniLM-L12-v2` (cuantizado) | Hugging Face Hub, una vez por navegador | ≈ 120 MB |
 
 Las matrices **no** se envían a ningún servidor: se leen y se procesan en el navegador.

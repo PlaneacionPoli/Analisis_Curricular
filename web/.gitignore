@@ -9,5 +9,5 @@ tests/golden_*.json
 tests/lexico_sin_heldout.json
 tests/*.log
 tools/*.log
-# motor WASM copiado en cada build (scripts/copiar_wasm.mjs)
+# motor WASM copiado en cada build (tools/copiar_wasm.mjs)
 public/ort/
