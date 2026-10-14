@@ -74,19 +74,21 @@ function tablaResumen(filas, cols, totales) {
   const OFICIALES = ['Asig. Oficial', 'Cr. Total', 'B. Institucional', 'B. Disciplinar', 'B. Electivo', 'Suma bloques', 'Cr. Fundamentacion', 'Cr. Profundizacion', 'Suma componentes'];
   const defCol = c => {
     const base = { title: c, field: c, headerSort: true };
-    if (c === 'Programa') return { ...base, frozen: true, minWidth: 230 };
+    if (c === 'Programa') return { ...base, frozen: true, minWidth: 250, formatter: cell => `<span class="celda-programa">${cell.getValue()}</span>` };
+    if (c === 'Modalidad') return { ...base, formatter: cell => { const v = cell.getValue(); return `<span class="pildora ${{ Presencial: 'azul', Virtual: 'verde', 'Híbrido': 'ambar' }[v] ?? 'gris'}">${v}</span>`; } };
+    if (c === 'Nivel') return { ...base, formatter: cell => { const v = cell.getValue(); return `<span class="pildora ${v === 'Posgrado' ? 'azul' : 'oscuro'}">${v}</span>`; } };
     if (TEXTO.includes(c)) return base;
     const col = { ...base, hozAlign: 'right' };
     col.formatter = cell => {
       const f = cell.getRow().getData(), v = cell.getValue() ?? 0;
       const vacia = !(f['Cr. Total'] > 0) && !(f['Asig. Oficial'] > 0);
       if (c === 'Diferencia') {
-        const el = cell.getElement();
-        if (vacia) { el.style.color = '#8a94a0'; return 'sin dato'; }
-        el.style.background = v === 0 ? '#e3f6ea' : '#fde8ec'; el.style.color = v === 0 ? '#1d6b3a' : '#a4153b'; el.style.fontWeight = '600';
-        return v === 0 ? '✓ 0' : v;
+        if (vacia) return '<span class="pildora gris">sin dato</span>';
+        return v === 0 ? '<span class="pildora verde">✓ coincide</span>' : `<span class="pildora rojo">${v > 0 ? '+' : ''}${v}</span>`;
       }
       if (vacia && OFICIALES.includes(c)) { cell.getElement().style.color = '#b8c2cc'; return '—'; }
+      if (c === 'Cr. Total' || c === 'Asignaturas') cell.getElement().style.fontWeight = '700';
+      if (v === 0 && OFICIALES.includes(c)) { cell.getElement().style.color = '#b8c2cc'; return '·'; }
       return v;
     };
     return col;
