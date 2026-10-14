@@ -7,11 +7,13 @@ import { aciertosPorFila, cargarConfig, configActual, hayConfig, resumirTendenci
 import { cmp } from '../data/util.js';
 import { aviso, botonDescarga, columnas, descargar, grafico, h, info, metrica, selector, tabla, titulo } from '../ui.js';
 import { datosIndicadores } from './indicadores.js';
+import { calcularFaltantes, estadoLote, modoPerfil } from '../perfil/lote.js';
+import { panelV1 } from './panelV1.js';
 
 const VARS = CRITERIOS.map(c => c[0]);
 const ICONO = { Cumple: '🟢 Cumple', Parcial: '🟡 Parcial', 'No cumple': '🔴 No cumple', 'Sin dato': '⚪ Sin dato' };
 const COLOR = { Cumple: '#1FB2DE', Parcial: '#FBAF17', 'No cumple': '#EC0677', 'Sin dato': '#8A94A0' };
-const local = { matriz: null, cfgCargando: false };
+const local = { matriz: null, cfgCargando: false, autoV1: false };
 const fmt = v => (v === null || v === undefined ? '—' : `${v.toFixed(0)}%`);
 const miles = n => n.toLocaleString('es-CO');
 const COL_ASIG = 'Nombre asignatura o modulo';
@@ -82,6 +84,16 @@ export function paginaResumen({ filas, todasFilas, archivos, archivoDe, etiqueta
       : aviso('info', `Preparando el resumen (Pasos 2, 3 y 4)… ${d.avance ? `${d.avance[0]} de ${d.avance[1]} archivos` : ''}`));
   }
 
+  // al entrar al Resumen, V1 se completa solo si ya se eligió el modo (con o sin modelo); la primera vez se pide la elección
+  const lote = estadoLote();
+  if (d.faltanPerfil > 0 && modoPerfil() && !lote.corriendo && !lote.error && !local.autoV1) {
+    local.autoV1 = true;
+    queueMicrotask(() => calcularFaltantes(archivoDe, modoPerfil(), rerender).finally(() => { local.autoV1 = false; }));
+  }
+
+  // mientras se calcula el perfil solo se muestra el avance: redibujar tablas y gráficos en cada paso saturaría el navegador
+  if (lote.corriendo) return h('div', {}, ...cab, panelV1({ archivoDe, faltan: d.faltanPerfil, rerender }));
+
   const vis = new Set(filas.map(f => f.Matriz));
   const evalVista = d.matrices.filter(m => vis.has(m.matriz) && (!seleccion || m.matriz === seleccion));
   const todo = agregar(d.matrices, d.v1);
@@ -89,7 +101,6 @@ export function paginaResumen({ filas, todasFilas, archivos, archivoDe, etiqueta
   const g = vista.globales;
   const ref = referenciasConjunto(todo.por_matriz);
   const filasVista = seleccion ? filas.filter(f => f.Matriz === seleccion) : filas;
-  const sinV1 = !Object.keys(d.v1).length;
   if (!g.matrices) return h('div', {}, ...cab, aviso('warning', 'Ninguna matriz de la vista tiene los Pasos 2, 3 y 4 legibles.'));
 
   const val = Object.fromEntries(vista.por_matriz.map(m => [m.Matriz, valorarMatriz(m, { sinRespaldo: d.perfil[m.Matriz]?.sin ?? null, tresCapas: d.perfil[m.Matriz]?.tres ?? null, referencia: ref })]));
@@ -138,7 +149,7 @@ export function paginaResumen({ filas, todasFilas, archivos, archivoDe, etiqueta
 
   return h('div', {}, ...cab,
     seleccion ? aviso('info', `<b>Vista de matriz:</b> ${etiqueta.get(seleccion)}. Las medianas de referencia son las de las ${ref.n} matrices cargadas.`) : h('p', { class: 'leyenda' }, descripcionFiltros),
-    sinV1 ? aviso('info', 'V1 usa el cálculo del perfil, que aún no está en este navegador. Calcula las matrices en «Perfil de Egreso (V1)» y vuelve: V1 se completa solo.') : null,
+    panelV1({ archivoDe, faltan: d.faltanPerfil, rerender }),
     ...d.errores.map(e => aviso('warning', `❌ <b>${e.archivo}</b>: ${e.causa}`)),
     columnas(...kpis.map(([e, v]) => metrica(e, miles(v)))),
     lectura.length ? h('div', {}, h('h3', {}, '🔎 Lectura rápida'), h('ul', {}, ...lectura.map(l => h('li', { html: l })))) : null,

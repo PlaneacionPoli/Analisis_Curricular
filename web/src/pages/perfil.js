@@ -4,6 +4,7 @@ import {
   COLORES_ESTADO, ESTADOS, estadoPorComponente, filasMetodo, indicadoresPerfil, libroExcel, mediana, sinAsociacion,
 } from '../perfil/indicadores.js';
 import { leerReferencia } from '../perfil/calibracion.js';
+import { estadoLote } from '../perfil/lote.js';
 import { calcularPerfil, estadoPerfil, iniciar, perfilEnCache, prepararConfig, reiniciar, validarConReferencia } from '../perfil/servicio.js';
 import { aCsv, aviso, botonDescarga, columnas, descargar, grafico, h, info, metrica, selector, tabla, titulo } from '../ui.js';
 
@@ -18,6 +19,7 @@ const memoria = {
   pestana: 'Resultados',
   perfilSel: 'Todos',
   config: null,
+  versionLote: 0,
   modo: leerModo(),         // 'semantico' | 'lexico' | null (aún no elegido)
 };
 
@@ -410,6 +412,9 @@ function vistaValidar(matrices, rerender) {
  */
 export function paginaPerfil({ matrices, visibles, seleccion, rerender }) {
   memoria.rerender = rerender;
+  // lo calculado desde Indicadores o el Resumen Ejecutivo comparte caché y modo con esta página
+  memoria.modo = leerModo();
+  if (memoria.versionLote !== estadoLote().version) { memoria.versionLote = estadoLote().version; memoria.consultadaCache = false; }
   consultarCache(matrices, rerender);
   const cfg = estadoPerfil().cfg;
   const m = seleccion ? matrices.find(x => x.id === seleccion) : null;

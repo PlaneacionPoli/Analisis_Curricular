@@ -5,10 +5,12 @@ import { agregar, calcularIndicadores, CRITERIOS, contrastes, ESTADOS_CRITERIO, 
 import { mediana } from '../data/estadistica.js';
 import { cmp } from '../data/util.js';
 import { perfilEnCache } from '../perfil/servicio.js';
+import { estadoLote } from '../perfil/lote.js';
+import { panelV1 } from './panelV1.js';
 import { indicadoresPerfil } from '../perfil/indicadores.js';
 import { aviso, botonDescarga, columnas, descargar, grafico, h, info, metrica, selector, tabla, titulo } from '../ui.js';
 
-const local = { firma: '', res: null, cargando: false, avance: null, error: null, v1: {}, perfil: {}, v1Firma: '', matrizVal: null, leyendo: false };
+const local = { firma: '', res: null, cargando: false, avance: null, error: null, v1: {}, perfil: {}, enCache: new Set(), versionLote: 0, v1Firma: '', matrizVal: null, leyendo: false };
 const COLOR_ESTADO = { Cumple: '#1FB2DE', Parcial: '#FBAF17', 'No cumple': '#EC0677', 'Sin dato': '#8A94A0' };
 const fmt = v => (v === null || v === undefined ? '—' : `${v.toFixed(0)}%`);
 
@@ -22,18 +24,19 @@ async function calcular(archivos, rerender) {
 
 /** V1 desde el módulo de perfil, solo de lo que ya está calculado en la caché. */
 async function leerV1(archivoDe, rerender) {
-  const v1 = {}, perfil = {};
+  const v1 = {}, perfil = {}, enCache = new Set();
   for (const [id, archivo] of archivoDe) {
     if (!archivo) continue;
     const r = await perfilEnCache(archivo);
     if (!r) continue;
+    enCache.add(id);
     const ind = indicadoresPerfil(r.items);
     if (!ind.Atributos) continue;
     v1[id] = [ind.n_alguna, ind.Atributos];
     perfil[id] = { sin: ind['% Sin asociación'], tres: ind['% Tres capas'], nSin: ind.n_sin, n: ind.Atributos };
   }
-  const cambio = JSON.stringify(v1) !== JSON.stringify(local.v1);
-  local.v1 = v1; local.perfil = perfil; local.leyendo = false;
+  const cambio = JSON.stringify(v1) !== JSON.stringify(local.v1) || enCache.size !== local.enCache.size;
+  local.v1 = v1; local.perfil = perfil; local.enCache = enCache; local.leyendo = false;
   if (cambio) rerender();
 }
 
@@ -48,10 +51,18 @@ export function datosIndicadores({ archivos, archivoDe, rerender }) {
     if (!local.cargando) calcular(archivos, rerender);
     return local.error ? { error: local.error } : { avance: local.avance };
   }
-  if (!local.leyendo && Object.keys(local.v1).length < archivos.length) { local.leyendo = true; leerV1(archivoDe, rerender); }
-  return { matrices: local.res.matrices, errores: local.res.errores, v1: local.v1, perfil: local.perfil };
+  asegurarV1(archivoDe, rerender);
+  return { matrices: local.res.matrices, errores: local.res.errores, v1: local.v1, perfil: local.perfil,
+    faltanPerfil: [...archivoDe].filter(([id, a]) => a && !local.enCache.has(id)).length };
 }
 
+
+function asegurarV1(archivoDe, rerender) {
+  const lote = estadoLote();
+  if (!local.leyendo && !lote.corriendo && (local.enCache.size < archivoDe.size || local.versionLote !== lote.version)) {
+    local.leyendo = true; local.versionLote = lote.version; leerV1(archivoDe, rerender);
+  }
+}
 
 const mediaPorMatriz = (porMatriz, campo) => mediana(porMatriz.map(m => m[campo]));
 
@@ -140,18 +151,18 @@ export function paginaIndicadores({ filas, archivos, archivoDe, etiqueta, selecc
     return h('div', {}, ...cab, local.error ? aviso('error', local.error)
       : aviso('info', `Leyendo los Pasos 2, 3 y 4… ${local.avance ? `${local.avance[0]} de ${local.avance[1]} archivos` : ''}`));
   }
-  if (!local.leyendo && Object.keys(local.v1).length < archivos.length) { local.leyendo = true; leerV1(archivoDe, rerender); }
+  asegurarV1(archivoDe, rerender);
 
+  if (estadoLote().corriendo) return h('div', {}, ...cab, panelV1({ archivoDe, faltan: 1, rerender }));
   const { errores, matrices } = local.res;
   const vis = new Set(filas.map(f => f.Matriz));
   const evalVista = matrices.filter(m => vis.has(m.matriz));
   const todo = agregar(matrices, local.v1);                // referencia: siempre el conjunto cargado
   const vista = agregar(seleccion ? evalVista.filter(m => m.matriz === seleccion) : evalVista, local.v1);
   const ref = referenciasConjunto(todo.por_matriz);
-  const sinV1 = !Object.keys(local.v1).length;
   const avisos = [
     ...errores.map(e => aviso('warning', `❌ <b>${e.archivo}</b>: ${e.causa}`)),
-    sinV1 ? aviso('info', 'V1 usa el cálculo del perfil, que aún no está en este navegador. Abre «Perfil de Egreso (V1)» y calcula las matrices; al volver aquí V1 se completa solo.') : null,
+    panelV1({ archivoDe, faltan: [...archivoDe].filter(([id, a]) => a && !local.enCache.has(id)).length, rerender }),
   ];
   if (!vista.globales.matrices) return h('div', {}, ...cab, ...avisos, aviso('warning', 'Ninguna matriz de la vista tiene los Pasos 2, 3 y 4 legibles.'));
 
