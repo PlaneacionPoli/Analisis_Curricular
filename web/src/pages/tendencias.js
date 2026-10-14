@@ -1,5 +1,4 @@
 // Páginas «Tendencias Globales» y «Configurar Tendencias».
-import * as XLSX from 'xlsx';
 import { aciertosPorFila, cargarConfig, configActual, guardarConfig as guardar, hayConfig, resumirTendencias, restaurarConfig as restaurar, validarImportacion } from '../data/tendencias.js';
 import { cmp } from '../data/util.js';
 import { libroListado } from '../export/excelListado.js';
@@ -13,13 +12,6 @@ function esperarConfig(rerender) {
   if (hayConfig()) return null;
   if (!local.cargando) { local.cargando = true; cargarConfig().then(() => { local.cargando = false; rerender(); }); }
   return aviso('info', 'Cargando la configuración de tendencias…');
-}
-
-function descargarLibro(nombre, hojas) {
-  const wb = XLSX.utils.book_new();
-  for (const [titulo, filas] of hojas) XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(filas), titulo);
-  const buf = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-  descargar(nombre, buf, 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 }
 
 function pestanas(nombres, actual, alCambiar) {

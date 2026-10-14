@@ -201,7 +201,7 @@ class Informe {
   notaMetodo(criterios) {
     this.seccion('Nota metodológica');
     this.lista(criterios.map(([v, e, c]) => `${v} ${e}: ${c}.`), 8);
-    this.parrafo('V2 (verbos repetidos entre competencias) se informa sin calificar: la plantilla no prohíbe repetir verbos. Estados: Cumple = la regla de la plantilla institucional se cumple en todos los casos; Parcial = en algunos; No cumple = en ninguno; Sin dato = la matriz no tiene la información para evaluarla. ' +
+    this.parrafo('Estados: Cumple = la regla de la plantilla institucional se cumple en todos los casos; Parcial = en algunos; No cumple = en ninguno; Sin dato = la matriz no tiene la información para evaluarla. ' +
       'No hay puntaje compuesto ni pesos; la mediana del conjunto cargado solo sitúa a cada matriz. El nivel de evidencia de los indicadores (N1 implementación a N5 efecto externo) y la exigencia de los RA se ' +
       'describen sin calificarse, porque la plantilla no fija un criterio para ellos.', 8, GRIS);
   }
@@ -242,6 +242,7 @@ export function informeGeneral(d, logo = null) {
     pdf.parrafo('Valor del conjunto, cada variable sobre su propia base.', 8, GRIS);
     pdf.barras([
       ['V1 Perfil alineado (alguna capa)', g.V1, CIAN, `${g.atributos_perfil ?? 0} atributos`],
+      ['V2 Competencias específicas con RA', g.V2_comp, CIAN, `${g.competencias_especificas ?? 0} competencias`],
       ['V3 RA evaluables', g.V3, CIAN, `${g.ra_unicos ?? 0} RA únicos`],
       ['V4 RA con estrategia meso', g.V4, CIAN, `${g.ra_unicos ?? 0} RA únicos`],
       ['V5 Estrategias con evidencia N2+', g.V5, CIAN, `${g.estrategias ?? 0} estrategias`],
@@ -254,9 +255,9 @@ export function informeGeneral(d, logo = null) {
   if (pri.length) {
     pdf.seccion('Matrices que requieren atención');
     pdf.parrafo('Ordenadas por número de criterios en «No cumple» y luego en «Parcial». Cada programa tiene su informe individual con el detalle y las acciones sugeridas.', 8, GRIS);
-    const cols = ['Programa', 'Modalidad', 'Ciudad', 'V1', 'V3', 'V4', 'V5', 'No cumple', 'Parcial'];
-    pdf.tabla(cols, pri.map(p => cols.map(c => p[c] ?? '')), [56, 22, 22, 14, 14, 14, 14, 12, 12],
-      { colEstado: [3, 4, 5, 6], tam: 6.8, alinear: ['LEFT', 'LEFT', 'LEFT', ...Array(6).fill('CENTER')] });
+    const cols = ['Programa', 'Modalidad', 'Ciudad', 'V1', 'V2', 'V3', 'V4', 'V5', 'No cumple', 'Parcial'];
+    pdf.tabla(cols, pri.map(p => cols.map(c => p[c] ?? '')), [50, 20, 20, 12, 12, 12, 12, 12, 11, 11],
+      { colEstado: [3, 4, 5, 6, 7], tam: 6.8, alinear: ['LEFT', 'LEFT', 'LEFT', ...Array(7).fill('CENTER')] });
   }
 
   const tx = d.taxonomias;
@@ -316,8 +317,8 @@ export function informePrograma(d, logo = null) {
 
   for (const m of d.matrices) {
     pdf.seccion(`Valoración por criterios - ${m.etiqueta ?? m.matriz}`);
-    pdf.tabla(['Criterio', 'Resultado', 'Estado', 'Mediana del conjunto'],
-      m.valoracion.map(v => [v.Variable !== '—' ? `${v.Variable} ${v.Tramo}` : v.Tramo, v.Resultado, v.Estado, v['Referencia (mediana)']]), [50, 72, 20, 38], { colEstado: [2], tam: 7.3 });
+    pdf.tabla(['Criterio', 'Resultado', 'Estado', 'Mediana del conjunto', 'Observación'],
+      m.valoracion.map(v => [v.Variable !== '—' ? `${v.Variable} ${v.Tramo}` : v.Tramo, v.Resultado, v.Estado, v['Referencia (mediana)'], v.Observación ?? '']), [34, 52, 16, 26, 52], { colEstado: [2], tam: 6.8 });
     if (m.recomendaciones?.length) { pdf.subtitulo('Acciones sugeridas'); pdf.lista(m.recomendaciones, 8.5); }
   }
 

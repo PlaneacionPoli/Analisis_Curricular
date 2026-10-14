@@ -1,6 +1,7 @@
 // Página «Taxonomías»: lo que declaran los RA (dominio y nivel), su exigencia y si el verbo con que inician corresponde a lo declarado.
 // Unidad: RA único por matriz. La referencia (mediana del índice de exigencia) es siempre la del conjunto cargado.
-import * as XLSX from 'xlsx';
+import { libroTaxonomias } from '../export/libros.js';
+import { MIME_XLSX } from '../export/excelMarca.js';
 import { baseVerbos, contrastar, DOMINIOS, ESTADOS, indiceExigencia, leerRA, porGrupo, resumenContraste } from '../data/taxonomias.js';
 import { ceder, cmp } from '../data/util.js';
 import { aviso, botonDescarga, columnas, descargar, grafico, h, info, metrica, multiselect, tabla, titulo } from '../ui.js';
@@ -182,12 +183,7 @@ function revision(ra, res, etiqueta, rerender) {
     filasTabla.length ? tabla(filasTabla, [{ title: 'Matriz', field: 'Matriz' }, { title: 'Verbo', field: 'Verbo', width: 110 }, { title: 'RA', field: 'RA', minWidth: 340, tooltip: true },
       { title: 'Lo que declara', field: 'Lo que declara', width: 190 }, { title: 'Lo que indica el verbo', field: 'Lo que indica el verbo', width: 210 }, { title: 'Resultado', field: 'Resultado', width: 150, formatter: colorEstado }],
     { height: Math.min(520, 46 * Math.min(filasTabla.length, 10) + 60) }) : aviso('success', 'No hay RA con el resultado elegido.'),
-    botonDescarga('Descargar el contraste (Excel)', () => {
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ra.map(({ clave, ...r }) => r)), 'Contraste');
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(grupos), 'Por programa');
-      descargar('taxonomias_contraste.xlsx', XLSX.write(wb, { bookType: 'xlsx', type: 'array' }), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    }));
+    botonDescarga('Descargar el contraste (Excel)', async () => descargar('taxonomias_contraste.xlsx', await libroTaxonomias({ ra, grupos, etiqueta, alcance: 'RA únicos de las matrices de la vista' }), MIME_XLSX)));
 }
 
 function listado(ra, etiqueta, rerender) {

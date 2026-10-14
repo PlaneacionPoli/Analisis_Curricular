@@ -21,8 +21,10 @@ let mal = 0;
 const igual = (nombre, a, b) => { const ok = JSON.stringify(a) === JSON.stringify(b); if (!ok) { mal++; console.log(`✗ ${nombre}\n   JS: ${JSON.stringify(a).slice(0, 300)}\n   Py: ${JSON.stringify(b).slice(0, 300)}`); } else console.log(`✓ ${nombre}`); };
 
 const quitarNull = o => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, v === undefined ? null : v]));
-igual('globales', quitarNull(js.globales), quitarNull(Object.fromEntries(Object.keys(js.globales).map(k => [k, g.globales[k]]))));
-igual('por matriz', orden(js.por_matriz).map(quitarNull), orden(g.por_matriz).map(quitarNull));
+// V2 se redefinió en la web (competencias específicas con RA): sus campos nuevos no existen en Python y se comparan solo las claves de la referencia
+const solo = (o, claves) => Object.fromEntries(claves.map(k => [k, o[k]]));
+igual('globales', quitarNull(solo(js.globales, Object.keys(g.globales))), quitarNull(g.globales));
+igual('por matriz', orden(js.por_matriz).map(m => quitarNull(solo(m, Object.keys(g.por_matriz[0])))), orden(g.por_matriz).map(quitarNull));
 const claveRA = r => `${r.matriz}|${r.ra}`;
 const campos = ['generica', 'RA_competencia', 'V3', 'motivo_V3', 'V4', 'estrategias'];
 const rj = new Map(js.ra.map(r => [claveRA(r), r]));
@@ -31,10 +33,10 @@ const ej = js.estrategias.map(e => `${e.matriz}|${e.estrategia}|${e.indicadores}
 igual('estrategias', ej, g.estrategias.map(e => `${e.matriz}|${e.estrategia}|${e.indicadores}|${e.instrumento}|${e.nivel_max}|${e.V5}|${e.directa}`).sort());
 igual('contrastes (Spearman, Kruskal, motivos)', contrastes(js.por_matriz), g.contrastes);
 const ref = referenciasConjunto(js.por_matriz);
-igual('referencias del conjunto', ref, Object.fromEntries(Object.keys(ref).map(k => [k, g.referencias[k]])));
-const val = Object.fromEntries(js.por_matriz.map(m => [m.Matriz, valorarMatriz(m, { referencia: ref }).map(({ Valor, ...r }) => r)]));
-// V2 se informa sin calificar en la web (decisión posterior a la versión de Python)
-const valPy = Object.fromEntries(Object.entries(g.valoracion).map(([k, v]) => [k, v.map(x => (x.Variable === 'V2' ? { ...x, Estado: 'Descriptiva' } : x))]));
+igual('referencias del conjunto', solo(ref, Object.keys(g.referencias)), g.referencias);
+const val = Object.fromEntries(js.por_matriz.map(m => [m.Matriz, valorarMatriz(m, { referencia: ref }).filter(x => x.Variable !== 'V2').map(({ Valor, Observación, ...r }) => r)]));
+// la fila V2 y la columna Observación son propias de la web (V2 redefinido)
+const valPy = Object.fromEntries(Object.entries(g.valoracion).map(([k, v]) => [k, v.filter(x => x.Variable !== 'V2')]));
 const ord = o => Object.fromEntries(Object.keys(o).sort().map(k => [k, o[k]]));
 igual('valoración por criterios', ord(val), ord(valPy));
 if (process.env.DEPURAR) {

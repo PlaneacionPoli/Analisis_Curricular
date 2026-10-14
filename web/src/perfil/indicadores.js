@@ -1,6 +1,6 @@
 // Indicadores de la asociación del perfil (V1) y exportación a Excel. Equivale a _indicadores_perfil y a la hoja de
 // resultados de pagina_asociacion_perfil() en dashboard_tematico.py.
-import * as XLSX from 'xlsx';
+import { libroMarca } from '../export/excelMarca.js';
 
 export const COLORES_ESTADO = {
   'Asociado en las tres capas': '#1fb2de',
@@ -70,25 +70,39 @@ export function sinAsociacion(resultado, matriz) {
   });
 }
 
-/** Libro de Excel con las hojas Indicadores, Atributos, Evidencia y Método (igual que la versión de Streamlit). */
-export function libroExcel({ resultados, etiquetas, metodo }) {
+/** Libro de Excel con las hojas Indicadores, Atributos, Evidencia y Método, con formato institucional y una hoja «Léeme». */
+export async function libroExcel({ resultados, etiquetas, metodo, alcance = '' }) {
+  const nombre = m => etiquetas.get(m) ?? m;
   const indicadores = [], atributos = [], evidencia = [];
   for (const [m, r] of resultados) {
-    indicadores.push({ Matriz: etiquetas.get(m) ?? m, ...limpiar(indicadoresPerfil(r.items)) });
-    for (const i of r.items) atributos.push({ Matriz: etiquetas.get(m) ?? m, ...i });
+    indicadores.push({ Matriz: nombre(m), ...renombrar(limpiar(indicadoresPerfil(r.items))) });
+    for (const i of r.items) {
+      atributos.push({ Matriz: nombre(m), Perfil: i.perfil, Componente: i.origen, Atributo: i.item, 'Evaluable': i.evaluable, 'Competencia': i.Competencia, 'RA': i.RA, 'Asignatura': i.Asignatura,
+        'Capas con respaldo (0–3)': i.capas_con_respaldo, Estado: i.estado });
+    }
     for (const f of r.filas) {
       if (f.entidad === 'NINGUNA') continue;
-      evidencia.push({ Matriz: etiquetas.get(m) ?? m, Atributo: f.item, Capa: f.capa, Respaldo: f.entidad, Nivel: f.nivel, Evidencia: f.evidencia });
+      evidencia.push({ Matriz: nombre(m), Atributo: f.item, Capa: f.capa, Respaldo: f.entidad, Nivel: f.nivel, Evidencia: f.evidencia });
     }
   }
-  const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(indicadores), 'Indicadores');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(atributos), 'Atributos');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(evidencia), 'Evidencia');
-  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(metodo.map(([Elemento, Valor]) => ({ Elemento, Valor: String(Valor) }))), 'Metodo');
-  return new Blob([XLSX.write(wb, { bookType: 'xlsx', type: 'array' })],
-    { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  return libroMarca({
+    titulo: 'Asociación del perfil de egreso con el currículo (V1)', alcance,
+    hojas: [
+      { nombre: 'Indicadores', descripcion: 'Una fila por matriz: porcentaje de atributos del perfil con respaldo en competencias, RA y asignaturas.', filas: indicadores, congelarColumnas: 1,
+        columnas: Object.keys(indicadores[0] ?? { Matriz: 1 }).map(campo => ({ campo, ...({ Matriz: { ancho: 44 }, 'V1 % (alguna capa)': { ayuda: 'Porcentaje de atributos evaluables con respaldo en al menos una capa. Es el indicador V1.' },
+          '% Tres capas': { ayuda: 'Porcentaje de atributos respaldados en competencias, RA y asignaturas a la vez.' }, '% Sin asociación': { ayuda: 'Porcentaje de atributos sin respaldo en ninguna capa.' } }[campo] ?? {}) })) },
+      { nombre: 'Atributos', descripcion: 'Cada atributo del perfil profesional y ocupacional, con las capas que lo respaldan y su estado. 1 = hay respaldo en esa capa, 0 = no.', filas: atributos, congelarColumnas: 1,
+        columnas: [{ campo: 'Matriz', ancho: 40 }, { campo: 'Perfil', ancho: 14 }, { campo: 'Componente', ancho: 24 }, { campo: 'Atributo', ancho: 70 }, { campo: 'Evaluable', ancho: 11 }, { campo: 'Competencia', ancho: 13 }, { campo: 'RA', ancho: 8 },
+          { campo: 'Asignatura', ancho: 11 }, { campo: 'Capas con respaldo (0–3)', ancho: 14 }, { campo: 'Estado', ancho: 26, ayuda: 'Asociado en las tres capas, asociación parcial (una o dos capas) o sin asociación.' }] },
+      { nombre: 'Evidencia', descripcion: 'El texto de la matriz que respalda cada asociación y su nivel (explícito si la cobertura de conceptos alcanza el umbral; parcial si además hay similitud semántica).', filas: evidencia, congelarColumnas: 1,
+        columnas: [{ campo: 'Matriz', ancho: 40 }, { campo: 'Atributo', ancho: 60 }, { campo: 'Capa', ancho: 16 }, { campo: 'Respaldo', ancho: 44 }, { campo: 'Nivel', ancho: 12 }, { campo: 'Evidencia', ancho: 80 }] },
+      { nombre: 'Método', descripcion: 'Parámetros, versión y huella de la configuración y archivos usados: permiten reproducir el cálculo.', filas: metodo.map(([Elemento, Valor]) => ({ Elemento, Valor: String(Valor) })),
+        columnas: [{ campo: 'Elemento', ancho: 44 }, { campo: 'Valor', ancho: 90 }] },
+    ],
+  });
 }
+
+const renombrar = o => ({ ...o });
 
 function limpiar(o) {
   const { n_alguna, n_tres, n_sin, ...resto } = o;

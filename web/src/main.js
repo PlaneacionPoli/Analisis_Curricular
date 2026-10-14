@@ -86,13 +86,10 @@ function barraLateral(hayDatos) {
     h('nav', {}, ...PAGINAS.map(([n, i]) => h('button', { type: 'button', class: n === pagina ? 'activo' : '',
       onclick: () => { actualizar({ pagina: n }); window.scrollTo(0, 0); } }, icono(i), n))),
     h('p', { class: 'nav-desc' }, actual[2]),
-    hayDatos ? h('div', { class: 'resumen-lateral' },
-      h('b', {}, new Set(datos.filas.map(f => f['Nombre asignatura o modulo'])).size), ' asignaturas', h('br'),
-      h('b', {}, datos.filas.length.toLocaleString('es-CO')), ' registros procesados') : null,
     hayDatos ? selector('Programa', ['Todos', ...programas], filtros.programa,
       v => actualizar({ filtros: { ...filtros, programa: v }, matriz: null })) : null,
     hayDatos ? selectorMatriz() : null,
-    h('p', { class: 'pie' }, 'Politécnico Grancolombiano', h('br'), 'Análisis Microcurricular v2.0'));
+    h('p', { class: 'pie' }, 'Politécnico Grancolombiano', h('br'), 'Análisis Microcurricular v2.0', h('br'), h('span', { class: 'creado-por' }, 'Creado por: Gerencia de Planeación y Gestión Institucional')));
 }
 
 function selectorMatriz() {

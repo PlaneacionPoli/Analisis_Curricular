@@ -61,7 +61,7 @@ export function leerMatriz(buffer, nombreArchivo) {
   for (const r of filasDe(wb, 'Paso 2')) {
     if (r.length > 5 && ne(r[5]) && !String(r[5]).trim().startsWith('[')) {
       if (norm(r[5]).startsWith('redaccion') || norm(noVacio(r[1])) === 'verbo competencia') continue;
-      competencias.push({ verbo: ne(r[1]) ? norm(r[1]) : '', texto: norm(r[5]), generica: norm(r[5]).includes(GENERICA) });
+      competencias.push({ verbo: ne(r[1]) ? norm(r[1]) : '', texto: norm(r[5]), original: lf(r[5]).trim(), generica: norm(r[5]).includes(GENERICA) });
     }
   }
   const ra = new Map();
@@ -137,13 +137,43 @@ export function evaluarMatriz(m, sim = crearSim()) {
     return { matriz: m.matriz, programa: m.programa, sede: m.sede, ra: d.texto, generica: t.includes(GENERICA), RA_competencia: v1, V3: ok3, motivo_V3: motivo3,
       V4: vinc.some(e => e.ins), estrategias: new Set(vinc).size };
   });
+  // cadena de cada competencia: RA que la desarrollan y estrategias mesocurriculares (con instrumento) a las que esos RA se vinculan
+  const cadena = m.competencias.map(c => {
+    const rasC = raLista.filter(d => [...d.competencias].some(k => k === c.texto || sim(k, c.texto) >= 0.8));
+    const meso = new Set(), conMeso = [];
+    for (const d of rasC) {
+      const vinc = m.meso.filter(([x]) => d.norm === x || sim(d.norm, x) >= 0.8 || mutuo.has(`${d.norm}\u0000${x}`)).map(([, e]) => e).filter(e => e.ins);
+      vinc.forEach(e => meso.add(e.estrategia));
+      if (vinc.length) conMeso.push(d.norm);
+    }
+    // cada competencia debe tener resultados para cada tipo de saber: se evalúa por competencia × tipo de saber
+    const porSaber = {};
+    for (const [saber, clave] of [['Saber', 'saber'], ['SaberHacer', 'saberhacer'], ['SaberSer', 'saberser']]) {
+      const delSaber = rasC.filter(d => [...d.tipos].some(t => String(t).toLowerCase().replace(/[^a-z]/g, '') === clave));
+      const estr = new Set(), con = [];
+      for (const d of delSaber) {
+        const vinc = m.meso.filter(([x]) => d.norm === x || sim(d.norm, x) >= 0.8 || mutuo.has(`${d.norm}\u0000${x}`)).map(([, e]) => e).filter(e => e.ins);
+        vinc.forEach(e => estr.add(e.estrategia));
+        if (vinc.length) con.push(d.norm);
+      }
+      porSaber[saber] = { ras: delSaber.map(d => d.norm), rasConMeso: con, estrategiasMeso: [...estr] };
+    }
+    return { competencia: c.original ?? c.texto, generica: c.generica, ras: rasC.map(d => d.norm), rasConMeso: conMeso, estrategiasMeso: [...meso], porSaber };
+  });
   const est = m.estrategias.map(e => {
     const niveles = e.indicadores.map(nivelIndicador);
     const max = niveles.length ? niveles.reduce((a, b) => (b > a ? b : a)) : null;
     return { matriz: m.matriz, programa: m.programa, sede: m.sede, estrategia: e.estrategia, indicadores: e.indicadores.length, niveles, instrumento: e.ins,
       nivel_max: max, V5: niveles.length > 0 && max.slice(0, 2) >= 'N2', directa: niveles.some(n => ['N3', 'N4'].includes(n.slice(0, 2))) };
   });
-  return { matriz: m.matriz, programa: m.programa, sede: m.sede, competencias: m.competencias.length, verbos_repetidos: repetidos, V2: !repetidos.length, ras, estrategias: est,
+  // V2: competencias específicas con al menos un RA que las desarrolle; la novedad de la genérica va como observación
+  const espec = cadena.filter(c => !c.generica), gen = cadena.find(c => c.generica);
+  const observacionV2 = !gen ? 'No declara competencia genérica (aplica al bloque institucional de pregrado).'
+    : !gen.ras.length ? 'La competencia genérica no tiene RA.'
+      : !gen.rasConMeso.length ? 'La competencia genérica tiene RA pero ninguna estrategia mesocurricular con instrumento.'
+        : 'La competencia genérica tiene RA y estrategia mesocurricular.';
+  const v2 = { especificas: espec.length, especificasConRA: espec.filter(c => c.ras.length).length, observacion: observacionV2, generica: gen ? (gen.rasConMeso.length ? 'completa' : gen.ras.length ? 'sin_estrategia' : 'sin_ra') : 'no_declarada' };
+  return { matriz: m.matriz, programa: m.programa, sede: m.sede, competencias: m.competencias.length, verbos_repetidos: repetidos, V2: !repetidos.length, v2, ras, cadena, estrategias: est,
     indicadores: m.estrategias.flatMap(e => e.indicadores.map(i => [e.estrategia, i, nivelIndicador(i)])) };
 }
 
@@ -157,7 +187,8 @@ export function agregar(matrices, v1 = {}) {
     const r = m.ras, e = m.estrategias, v = v1[m.matriz];
     return { Matriz: m.matriz, Programa: m.programa, Sede: m.sede, Competencias: m.competencias, 'RA únicos': r.length, Estrategias: e.length,
       'V1 %': v && v[1] ? redondear(100 * v[0] / v[1], 1) : null, 'RA con competencia %': pct(r.map(x => x.RA_competencia)),
-      V2: m.V2 ? 'Sí' : 'No', 'Verbos repetidos': m.verbos_repetidos.join(', '), 'V3 %': pct(r.map(x => x.V3)), 'V4 %': pct(r.map(x => x.V4)),
+      V2: m.V2 ? 'Sí' : 'No', 'Verbos repetidos': m.verbos_repetidos.join(', '),
+      'V2 %': m.v2.especificas ? redondear(100 * m.v2.especificasConRA / m.v2.especificas, 1) : null, 'Competencias específicas': m.v2.especificas, 'Competencias específicas con RA': m.v2.especificasConRA, 'Observación V2': m.v2.observacion, 'V3 %': pct(r.map(x => x.V3)), 'V4 %': pct(r.map(x => x.V4)),
       'RA sin estrategia': r.filter(x => !x.V4).length, 'V5 %': pct(e.map(x => x.V5)), 'Evidencia directa %': pct(e.map(x => x.directa)),
       'Estrategias con indicador e instrumento': e.filter(x => x.indicadores > 0 && x.instrumento).length,
       'Indicadores por nivel': cuenta(e.flatMap(x => x.niveles.map(n => n.slice(0, 2)))) };
@@ -168,7 +199,10 @@ export function agregar(matrices, v1 = {}) {
     matrices: matrices.length, programas: new Set(matrices.map(m => m.programa)).size, competencias: matrices.reduce((s, m) => s + m.competencias, 0),
     ra_unicos: ras.length, estrategias: est.length, indicadores: inds.length,
     V1: matrices.some(m => (v1[m.matriz] ?? [0, 0])[1]) ? redondear(100 * sumV1(0) / sumV1(1), 1) : null, atributos_perfil: sumV1(1),
-    RA_competencia: pct(ras.map(r => r.RA_competencia)), V2: pct(matrices.map(m => m.V2)), V3: pct(ras.map(r => r.V3)), V4: pct(ras.map(r => r.V4)),
+    RA_competencia: pct(ras.map(r => r.RA_competencia)), V2: pct(matrices.map(m => m.V2)),
+    V2_comp: matrices.reduce((s, m) => s + m.v2.especificas, 0) ? redondear(100 * matrices.reduce((s, m) => s + m.v2.especificasConRA, 0) / matrices.reduce((s, m) => s + m.v2.especificas, 0), 1) : null,
+    competencias_especificas: matrices.reduce((s, m) => s + m.v2.especificas, 0), genericas_sin_estrategia: matrices.filter(m => m.v2.generica === 'sin_estrategia').length,
+    genericas_declaradas: matrices.filter(m => m.v2.generica !== 'no_declarada').length, genericas_sin_ra: matrices.filter(m => m.v2.generica === 'sin_ra').length, V3: pct(ras.map(r => r.V3)), V4: pct(ras.map(r => r.V4)),
     V4_programa: pct(ras.filter(r => !r.generica).map(r => r.V4)), ra_genericos: ras.filter(r => r.generica).length,
     genericos_con_estrategia: ras.filter(r => r.generica && r.V4).length, ra_sin_estrategia: ras.filter(r => !r.V4).length,
     ra_sin_estrategia_programa: ras.filter(r => !r.V4 && !r.generica).length, V5: pct(est.map(e => e.V5)),
@@ -225,13 +259,13 @@ export function contrastes(porMatriz, minN = 10) {
 // ── valoración por criterios (D26) ───────────────────────────────────────────
 export const CRITERIOS = [
   ['V1', 'Perfil alineado', 'Cada atributo del perfil alineado en al menos una capa (competencias, RA o asignaturas)'],
-  ['V2', 'Coherencia de competencias', 'Ningún verbo repetido entre competencias específicas'],
+  ['V2', 'Competencias alineadas con RA', 'Toda competencia específica alineada con al menos un RA del Paso 3'],
   ['V3', 'Evaluabilidad de los RA', 'Todo RA con verbo observable y finalidad de desempeño o producto'],
   ['V4', 'Trazabilidad de los RA', 'Todo RA vinculado a una estrategia mesocurricular con instrumento'],
   ['V5', 'Indicadores de las estrategias', 'Cada estrategia declara al menos un indicador y un instrumento (Paso 4)'],
 ];
-/** V2 (verbos repetidos entre competencias) se informa pero no se califica: la plantilla no prohíbe repetir verbos. */
-export const DESCRIPTIVOS = new Set(['V2']);
+/** Criterios que se informan sin calificar (hoy ninguno: V2 es la alineación de las competencias específicas con los RA). */
+export const DESCRIPTIVOS = new Set();
 export const CRITERIOS_EVALUADOS = CRITERIOS.filter(c => !DESCRIPTIVOS.has(c[0]));
 export const ESTADOS_CRITERIO = ['Cumple', 'Parcial', 'No cumple'];
 export const estadoCriterio = p => (p === null || p === undefined ? 'Sin dato' : p >= 100 ? 'Cumple' : p <= 0 ? 'No cumple' : 'Parcial');
@@ -245,25 +279,28 @@ export function referenciasConjunto(porMatriz, exigencia = {}) {
   ref.V2 = porMatriz.length ? redondear(100 * porMatriz.filter(m => m.V2 === 'Sí').length / porMatriz.length, 1) : null;
   const ex = Object.values(exigencia).filter(x => x !== null && x !== undefined);
   ref.exigencia = ex.length ? redondear(mediana(ex), 1) : null;
+  { const xs = porMatriz.map(m => m['V2 %']).filter(x => x !== null && x !== undefined); ref['V2 %'] = xs.length ? redondear(mediana(xs), 1) : null; }
   ref.n = porMatriz.length;
   return ref;
 }
 
-const fmtPct = x => (x === null || x === undefined ? '—' : `${x.toFixed(0)} %`.replace('.', ','));
+/** Redondeo al entero como format(x, '.0f') de Python (la mitad va al par: 62,5 → 62). */
+const entero = x => { const f = Math.floor(x); return Math.abs(x - f - 0.5) < 1e-9 ? (f % 2 === 0 ? f : f + 1) : Math.round(x); };
+const fmtPct = x => (x === null || x === undefined ? '—' : `${entero(x)} %`);
 
 export function valorarMatriz(fila, { sinRespaldo = null, tresCapas = null, referencia = {}, exigencia = null } = {}) {
   const nRA = fila['RA únicos'] || 0, nEst = fila.Estrategias || 0;
   const resultado = {
     V1: [fila['V1 %'], `${fmtPct(fila['V1 %'])} con alguna alineación` + (sinRespaldo !== null ? `; ${fmtPct(sinRespaldo)} sin alineación` : '') + (tresCapas !== null ? `; ${fmtPct(tresCapas)} con las tres capas` : '')],
-    V2: [fila.V2 === 'Sí' ? 100 : 0, fila.V2 === 'Sí' ? 'Sin verbos repetidos' : `Verbo repetido: ${fila['Verbos repetidos']}`],
+    V2: [fila['V2 %'], fila['Competencias específicas'] ? `${fmtPct(fila['V2 %'])}: ${fila['Competencias específicas con RA']} de ${fila['Competencias específicas']} competencias específicas con RA` : 'Sin competencias específicas'],
     V3: [fila['V3 %'], `${fmtPct(fila['V3 %'])} de ${nRA} RA`],
     V4: [fila['V4 %'], `${fmtPct(fila['V4 %'])} de ${nRA} RA (${fila['RA sin estrategia'] ?? 0} sin estrategia)`],
     V5: [nEst ? 100 * (fila['Estrategias con indicador e instrumento'] ?? 0) / nEst : null, `${fila['Estrategias con indicador e instrumento'] ?? 0} de ${nEst} estrategias`],
   };
-  const refs = { V1: fmtPct(referencia['V1 %']), V2: referencia.V2 !== null && referencia.V2 !== undefined ? `${fmtPct(referencia.V2)} de las matrices cumple` : '—',
+  const refs = { V1: fmtPct(referencia['V1 %']), V2: fmtPct(referencia['V2 %']),
     V3: fmtPct(referencia['V3 %']), V4: fmtPct(referencia['V4 %']), V5: '—' };
   const filas = CRITERIOS.map(([v, tramo, criterio]) => ({ Variable: v, Tramo: tramo, Criterio: criterio, Resultado: resultado[v][1], Valor: resultado[v][0],
-    Estado: DESCRIPTIVOS.has(v) ? 'Descriptiva' : estadoCriterio(resultado[v][0]), 'Referencia (mediana)': refs[v] }));
+    Estado: DESCRIPTIVOS.has(v) ? 'Descriptiva' : estadoCriterio(resultado[v][0]), 'Referencia (mediana)': refs[v], Observación: v === 'V2' ? (fila['Observación V2'] ?? '') : '' }));
   // filas descriptivas (sin criterio en la plantilla), como valorar_matriz de Python
   const niv = fila['Indicadores por nivel'] ?? {};
   const nInd = Object.values(niv).reduce((a, b) => a + b, 0);

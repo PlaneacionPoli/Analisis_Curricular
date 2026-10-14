@@ -1,6 +1,5 @@
 // Página «Indicadores V1–V5»: ruta de alineación, valoración por criterios, trazabilidad, niveles de evidencia.
 // Conjunto = lo que reporta el artículo; matriz = una unidad programa-sede frente a la mediana de TODAS las matrices cargadas.
-import * as XLSX from 'xlsx';
 import { agregar, calcularIndicadores, CRITERIOS_EVALUADOS as CRITERIOS, ESTADOS_CRITERIO, NIVELES, referenciasConjunto, valorarMatriz } from '../data/indicadores.js';
 import { mediana } from '../data/estadistica.js';
 import { cmp } from '../data/util.js';
@@ -8,6 +7,8 @@ import { perfilEnCache } from '../perfil/servicio.js';
 import { estadoLote } from '../perfil/lote.js';
 import { panelV1 } from './panelV1.js';
 import { indicadoresPerfil } from '../perfil/indicadores.js';
+import { libroIndicadores } from '../export/libros.js';
+import { MIME_XLSX } from '../export/excelMarca.js';
 import { aviso, botonDescarga, columnas, descargar, grafico, h, info, metrica, selector, tabla, titulo } from '../ui.js';
 
 const local = { firma: '', res: null, cargando: false, avance: null, error: null, v1: {}, perfil: {}, enCache: new Set(), versionLote: 0, v1Firma: '', matrizVal: null, leyendo: false };
@@ -72,7 +73,7 @@ function ruta(g, ref = null) {
     ['V1 Atributo del perfil con alineación en alguna capa', g.V1, `${g.atributos_perfil} atributos`, '#1FB2DE', ref?.V1],
     ['RA vinculado a una competencia', g.RA_competencia, `${g.ra_unicos} RA únicos`, '#8A94A0', ref?.RA],
     ['V3 RA evaluable', g.V3, `${g.ra_unicos} RA únicos`, '#8A94A0', ref?.V3],
-    ['V2 Matriz sin verbo repetido', g.V2, `${g.matrices} matrices`, '#1FB2DE', null],
+    ['V2 Competencia específica con RA', g.V2_comp, `${g.competencias_especificas} competencias`, '#1FB2DE', ref?.['V2 %']],
     ['V4 RA con estrategia mesocurricular', g.V4, `${g.ra_unicos} RA únicos`, '#1FB2DE', ref?.V4],
     ['Estrategia con indicador e instrumento', estInd, `${g.estrategias} estrategias`, '#8A94A0', ref?.IND],
   ].filter(x => x[1] !== null && x[1] !== undefined);
@@ -94,7 +95,7 @@ function figValoracion(val) {
 }
 
 function tablaValoracion(filas) {
-  return tabla(filas.map(({ Valor, ...r }) => r), ['Variable', 'Tramo', 'Criterio', 'Resultado', 'Estado', 'Referencia (mediana)'].map(c => ({ title: c, field: c,
+  return tabla(filas.map(({ Valor, ...r }) => r), ['Variable', 'Tramo', 'Criterio', 'Resultado', 'Estado', 'Referencia (mediana)', 'Observación'].map(c => ({ title: c, field: c,
     ...(c === 'Criterio' || c === 'Resultado' ? { minWidth: 280, formatter: 'textarea' } : {}),
     ...(c === 'Estado' ? { formatter: cell => { const v = cell.getValue(); cell.getElement().style.color = COLOR_ESTADO[v] ?? '#000'; cell.getElement().style.fontWeight = 'bold'; return v; } } : {}) })),
   { height: false });
@@ -116,21 +117,15 @@ function tablaSimple(filas, cols, altura = false) {
     : h('p', { class: 'leyenda' }, 'Sin registros.');
 }
 
-function excel(res) {
-  const wb = XLSX.utils.book_new();
-  const hoja = (n, f) => XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(f), n);
-  hoja('Por_matriz', res.por_matriz.map(m => ({ ...m, 'Indicadores por nivel': JSON.stringify(m['Indicadores por nivel']) })));
-  hoja('RA', res.ra);
-  hoja('Estrategias', res.estrategias.map(({ niveles, ...e }) => e));
-  hoja('Indicadores_P4', res.indicadores);
-  descargar('indicadores_v1_v5.xlsx', XLSX.write(wb, { bookType: 'xlsx', type: 'array' }), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+async function excel(vista, val, etiqueta, alcance) {
+  descargar('indicadores_v1_v5.xlsx', await libroIndicadores({ vista, val, etiqueta, alcance }), MIME_XLSX);
 }
 
 function metricas(g) {
   return columnas(
     metrica('Matrices / programas', `${g.matrices} / ${g.programas}`),
     metrica('V1 Perfil', fmt(g.V1), g.V1 === null ? 'Calcula el perfil en «Perfil de Egreso (V1)» para ver V1.' : `${g.atributos_perfil} atributos evaluables del perfil.`),
-    metrica('V2 Coherencia', fmt(g.V2), `${g.matrices_con_repeticion} matriz(ces) con verbo repetido (informativo; no se califica).`),
+    metrica('V2 Competencias con RA', fmt(g.V2_comp), `${g.competencias_especificas} competencias específicas. Genérica sin estrategia mesocurricular en ${g.genericas_sin_estrategia} de ${g.genericas_declaradas} matrices.`),
     metrica('V3 Evaluabilidad', fmt(g.V3), `${g.ra_unicos} RA únicos.`),
     metrica('V4 Trazabilidad', fmt(g.V4), `Sin el RA genérico: ${fmt(g.V4_programa)}.`),
     metrica('V5 Evidencia (N2+)', fmt(g.V5), `Evidencia directa (N3–N4, descriptiva): ${g.estrategias_directa} de ${g.estrategias} estrategias (${fmt(g.evidencia_directa)}).`));
@@ -200,7 +195,7 @@ export function paginaIndicadores({ filas, archivos, archivoDe, etiqueta, selecc
         tablaSimple(niv.map(([Nivel, Indicadores]) => ({ Nivel, Indicadores, '%': Math.round(1000 * Indicadores / totalNiv) / 10 }))),
         h('p', { class: 'leyenda' }, 'N1 implementación · N2 percepción · N3 aprendizaje demostrado · N4 transferencia · N5 efecto externo.'))),
     h('hr'),
-    botonDescarga('Descargar indicadores V1–V5 (Excel)', () => excel(vista)));
+    botonDescarga('Descargar indicadores V1–V5 (Excel)', () => excel(vista, val, etiqueta, seleccion ? `Matriz: ${etiqueta.get(seleccion) ?? seleccion}` : 'Conjunto de las matrices de la vista')));
 }
 
 function vistaMatriz({ g, vista, todo, ref, val, seleccion, etiqueta, incrustada }) {

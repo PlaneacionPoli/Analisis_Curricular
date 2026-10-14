@@ -318,16 +318,11 @@ function vistaConjunto(visibles, todas, rerender) {
         calculadas.map(m => m.archivo)))));
 }
 
-function descargarExcel(resultados, etiquetas, archivos) {
+async function descargarExcel(resultados, etiquetas, archivos) {
   const st = estadoPerfil();
-  const blob = libroExcel({ resultados, etiquetas,
+  const blob = await libroExcel({ resultados, etiquetas, alcance: resultados.length === 1 ? `Matriz: ${etiquetas.get(resultados[0][0])}` : `${resultados.length} matrices`,
     metodo: filasMetodo({ cfg: st.cfg, huella: st.huella, semantica: resultados.every(([, r]) => r.semantica), archivos: archivos.filter(Boolean) }) });
-  const url = URL.createObjectURL(blob);
-  const a = h('a', { href: url, download: 'asociacion_perfil.xlsx' });
-  document.body.append(a);
-  a.click();
-  a.remove();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
+  descargar('asociacion_perfil.xlsx', blob, blob.type);
 }
 
 // ── Método ───────────────────────────────────────────────────────────────────
