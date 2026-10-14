@@ -2,7 +2,7 @@
 // verbos. Unidad: RA único por matriz. La referencia (mediana del índice de exigencia) es siempre la del conjunto cargado.
 import * as XLSX from 'xlsx';
 import { baseVerbos, contrastar, DOMINIOS, ESTADOS, indiceExigencia, leerRA, porGrupo, resumenContraste } from '../data/taxonomias.js';
-import { cmp } from '../data/util.js';
+import { ceder, cmp } from '../data/util.js';
 import { aviso, botonDescarga, columnas, descargar, grafico, h, info, metrica, multiselect, tabla, titulo } from '../ui.js';
 
 const COLOR_DOM = { Cognitivo: '#2E86C1', Procedimental: '#1E8449', Actitudinal: '#42F2F2', 'Sin dominio': '#BDC3C7' };
@@ -23,7 +23,7 @@ async function calcular(archivos, rerender) {
     const ra = [];
     for (let i = 0; i < archivos.length; i++) {
       local.avance = [i, archivos.length]; rerender();
-      await new Promise(r => setTimeout(r, 0));
+      await ceder();
       try { ra.push(...leerRA(new Uint8Array(archivos[i].buffer), archivos[i].nombre)); } catch { /* archivo sin Paso 3 legible */ }
     }
     local.cache = contrastar(ra, base);

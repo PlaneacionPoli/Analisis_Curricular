@@ -242,3 +242,6 @@ select, .ms summary {
 .vista-actual { background: var(--fondo-sec); border-left: 4px solid var(--primario); padding: .5rem .9rem; border-radius: 6px; margin: .6rem 0; font-size: .92rem; }
 code { background: #f1f5f9; padding: 1px 5px; border-radius: 4px; font-size: .8rem; word-break: break-all; }
 .lateral .selector-matriz select { border-color: var(--acento); }
+
+.barra-avance { height: 8px; border-radius: 999px; background: #e3edf5; overflow: hidden; margin: .4rem 0 1rem; }
+.barra-avance > div { height: 100%; background: linear-gradient(90deg, var(--primario), #42f2f2); transition: width .3s; }

@@ -84,3 +84,16 @@ export function contar(arr, f = x => x) {
   }
   return m;
 }
+
+/**
+ * Cede el control al navegador sin usar setTimeout: en una pestaña en segundo plano los temporizadores se ralentizan
+ * (hasta 1 por segundo o menos) y un bucle de 50 archivos tardaría minutos. MessageChannel no se limita.
+ */
+export function ceder() {
+  return new Promise(ok => {
+    if (typeof MessageChannel === 'undefined') { setTimeout(ok, 0); return; }
+    const c = new MessageChannel();
+    c.port1.onmessage = () => { c.port1.close(); ok(); };
+    c.port2.postMessage(0);
+  });
+}

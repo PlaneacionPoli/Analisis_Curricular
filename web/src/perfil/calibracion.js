@@ -1,5 +1,6 @@
 // Port de src/calibracion_asociacion.py: acuerdo del método con una lectura de referencia y calibración de umbrales.
 // Referencia (CSV, separador «;»): Matriz;Enfoque;Inicio_item;Competencia;RA;Asignatura[;Fuente]
+import { ceder } from '../data/util.js';
 import { puntajes } from './asociar.js';
 import { CAPAS, itemsPerfil, leerMatriz, norm } from './leerMatriz.js';
 
@@ -107,7 +108,7 @@ export async function calibrar(casos, alProgreso = null) {
     casos.forEach((c, i) => { const v = nucleo ? c.cobN : c.cob; for (let k = 0; k < c.sem.length; k++) { C[inicios[i] + k] = v[k]; S[inicios[i] + k] = c.sem[k]; } });
     for (const e of EXPLICITA) {
       alProgreso?.(hecho++, EXPLICITA.length * 2);
-      await new Promise(r => setTimeout(r, 0));
+      await ceder();
       for (const pa of PARCIAL.filter(v => v <= e)) {
         for (const se of SEMANTICA) {
           const pr = new Array(casos.length).fill(0);

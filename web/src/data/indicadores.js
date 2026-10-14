@@ -4,6 +4,7 @@ import * as XLSX from 'xlsx';
 import { crearSim } from './difflib.js';
 import { kruskal, mediana, spearman } from './estadistica.js';
 import { nombreMatriz } from './parseMatrix.js';
+import { ceder } from './util.js';
 
 export const SEDES = ['PBOG', 'PMED', 'VNAL', 'HMED', 'HBOG', 'HVAL'];
 const GENERICA = 'fenomenos contemporaneos';
@@ -183,7 +184,7 @@ export async function calcularIndicadores(archivos, { v1 = {}, alAvance = null }
   const matrices = [], errores = [];
   for (let i = 0; i < archivos.length; i++) {
     alAvance?.(i, archivos.length, archivos[i].nombre);
-    await new Promise(r => setTimeout(r, 0));
+    await ceder();
     try { matrices.push(evaluarMatriz(leerMatriz(new Uint8Array(archivos[i].buffer), archivos[i].nombre))); }
     catch (e) { errores.push({ archivo: archivos[i].nombre, causa: String(e?.message ?? e).slice(0, 120) }); }
   }

@@ -74,6 +74,15 @@ async function consultarCache(matrices, rerender) {
   rerender();
 }
 
+/** El modelo emite ~1000 eventos de avance al descargarse: se repinta a lo sumo 2 veces por segundo. */
+let ultimoPintado = 0;
+function repintarModelo(rerender) {
+  const ahora = performance.now();
+  if (ahora - ultimoPintado < 500) return;
+  ultimoPintado = ahora;
+  rerender();
+}
+
 async function calcular(m, rerender, { silencioso = false } = {}) {
   if (!memoria.modo) { rerender(); return; }
   if (memoria.enCurso.has(m.id) || memoria.resultados.has(m.id)) return;
@@ -81,7 +90,7 @@ async function calcular(m, rerender, { silencioso = false } = {}) {
   memoria.errores.delete(m.id);
   if (!silencioso) rerender();
   try {
-    await iniciar({ conSemantica: memoria.modo === 'semantico', alModelo: p => { memoria.modelo = p; if (p?.status === 'progress' || p?.status === 'done') rerender(); } });
+    await iniciar({ conSemantica: memoria.modo === 'semantico', alModelo: p => { memoria.modelo = p; repintarModelo(rerender); } });
     const r = await calcularPerfil(m.archivo, { alAvance: a => { memoria.avance = a; } });
     memoria.resultados.set(m.id, r);
   } catch (e) {
@@ -246,8 +255,12 @@ function vistaConjunto(visibles, todas, rerender) {
   const faltan = visibles.length - calculadas.length;
   const bloques = [];
   if (memoria.lote) {
-    bloques.push(aviso('info', `Calculando el perfil: ${memoria.lote.hechas} de ${memoria.lote.total} matrices` +
-      (memoria.lote.nombre ? ` · ${memoria.lote.nombre}` : '') + '. Cada matriz tarda unos segundos; el resultado queda guardado en este navegador.'));
+    // durante el cálculo solo se muestra el avance: reconstruir tablas y gráficos en cada matriz congelaría la página
+    const { hechas, total, nombre } = memoria.lote, mod = memoria.modelo;
+    return h('div', {}, aviso('info', `Calculando el perfil: <b>${hechas} de ${total}</b> matrices` + (nombre ? ` · ${nombre}` : '') +
+      '. Cada matriz tarda unos segundos; el resultado queda guardado en este navegador.' +
+      (mod?.status === 'progress' && hechas === 0 ? ` Descargando el modelo semántico (${Math.round(mod.progress ?? 0)} %; solo la primera vez).` : '')),
+      h('div', { class: 'barra-avance' }, h('div', { style: { width: `${100 * hechas / Math.max(total, 1)}%` } })));
   } else if (faltan && !memoria.modo) {
     bloques.push(panelModo(rerender));
   } else if (faltan) {
