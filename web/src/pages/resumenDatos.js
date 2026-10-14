@@ -89,16 +89,17 @@ export function calcularResumen({ filas, todasFilas, d, etiqueta, seleccion = nu
   const lectura = [];
   if (prioridades.length) {
     const n = prioridades.length, conNC = prioridades.filter(p => p['No cumple'] > 0).length, todas = prioridades.filter(p => VARS.every(v => p[v] === 'Cumple')).length;
-    lectura.push(`<b>${conNC} de ${n}</b> matrices tienen al menos un criterio en «No cumple»; <b>${todas}</b> ${todas === 1 ? 'cumple' : 'cumplen'} los ${VARS.length} criterios evaluados.`);
+    lectura.push(conNC ? `<b>${conNC} de ${n}</b> matrices incumplen por completo al menos un criterio («No cumple»).` : `Ninguna de las <b>${n}</b> matrices incumple por completo un criterio.`);
+    lectura.push(`<b>${todas} de ${n}</b> matrices cumplen los ${VARS.length} criterios evaluados.`);
     const peor = [...conteo].sort((a, b) => b[2]['No cumple'] - a[2]['No cumple'])[0];
-    if (peor[2]['No cumple']) lectura.push(`El criterio con más incumplimiento es <b>${peor[0]}</b> (${peor[2]['No cumple']} matrices en «No cumple», ${peor[2].Parcial} en «Parcial»).`);
+    if (peor[2]['No cumple']) lectura.push(`El criterio con más incumplimiento es <b>${peor[0]}</b>: ${peor[2]['No cumple']} matrices en «No cumple» y ${peor[2].Parcial} en «Parcial».`);
     const cumplidos = conteo.filter(c => c[2].Cumple === n).map(c => c[0]);
-    if (cumplidos.length) lectura.push(`Todas las matrices cumplen: <b>${cumplidos.join(', ')}</b>.`);
+    if (cumplidos.length) lectura.push(`Cumplen en todas las matrices: <b>${cumplidos.join(', ')}</b>.`);
   }
   const nSinAl = Object.entries(d.perfil).filter(([m]) => vis.has(m) && (!seleccion || m === seleccion)).reduce((a, [, p]) => [a[0] + p.nSin, a[1] + p.n], [0, 0]);
-  if (nSinAl[1]) lectura.push(`Perfil de egreso: <b>${nSinAl[0]} de ${nSinAl[1]}</b> atributos (${(100 * nSinAl[0] / nSinAl[1]).toFixed(0)} %) sin alineación en ninguna capa (competencias, RA o asignaturas).`);
-  if (g.ra_unicos) lectura.push(`De <b>${g.ra_unicos}</b> RA únicos, <b>${g.ra_sin_estrategia}</b> no tienen estrategia mesocurricular con instrumento (V4) y <b>${vista.ra.filter(r => !r.V3).length}</b> no son evaluables (V3).`);
-  if (g.estrategias) lectura.push(`<b>${g.estrategias_directa} de ${g.estrategias}</b> estrategias declaran indicadores de aprendizaje demostrado o transferencia (N3–N4).`);
+  if (nSinAl[1]) lectura.push(`Perfil de egreso: <b>${nSinAl[0].toLocaleString('es-CO')} de ${nSinAl[1].toLocaleString('es-CO')}</b> atributos (${(100 * nSinAl[0] / nSinAl[1]).toFixed(0)} %) no tienen alineación en competencias, RA ni asignaturas.`);
+  if (g.ra_unicos) lectura.push(`De <b>${g.ra_unicos}</b> RA únicos, <b>${g.ra_sin_estrategia}</b> no se vinculan a una estrategia mesocurricular con instrumento (V4) y <b>${vista.ra.filter(r => !r.V3).length}</b> no son evaluables (V3).`);
+  if (g.estrategias) lectura.push(`<b>${g.estrategias_directa} de ${g.estrategias}</b> estrategias declaran indicadores de aprendizaje demostrado o de transferencia (N3–N4).`);
 
   // tendencias globales: presencia por asignatura y por programa
   let tend = null, presencia = null;

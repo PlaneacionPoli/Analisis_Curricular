@@ -73,7 +73,7 @@ function vistaConjunto({ cab, filas, rerender }) {
       h('hr'), h('h3', {}, 'Mapa de calor: asignaturas × programas'),
       comp.length > heat.length ? h('p', { class: 'leyenda' }, `Se muestran las ${heat.length} más compartidas de ${comp.length}.`) : null,
       grafico([{ type: 'heatmap', z: heat.map(x => programas.map(p => (x.programas.includes(p) ? 1 : 0))), x: programas.map(p => p.slice(0, 30)), y: heat.map(x => x.Asignatura.slice(0, 60)),
-        colorscale: 'Blues', showscale: false, hovertemplate: '%{y}<br>%{x}<extra></extra>' }],
+        colorscale: [[0, '#C8E6F5'], [1, '#0F385A']], showscale: false, hovertemplate: '%{y}<br>%{x}<extra></extra>' }],
       { height: Math.max(300, heat.length * 16 + 140), margin: { l: 280, r: 20, t: 20, b: 160 }, xaxis: { tickangle: 40, tickfont: { size: 9 } }, yaxis: { autorange: 'reversed', tickfont: { size: 9 } } }),
       h('hr'), h('h3', {}, 'Asignaturas por cantidad de programas'), histograma(comp))
       : aviso('success', 'No se encontraron asignaturas compartidas entre programas.'),

@@ -1,4 +1,5 @@
 // Orquesta la carga: lee archivos, calcula su huella, los procesa en el worker y consolida.
+import { asignarFacultades } from './facultades.js';
 import { consolidar } from './consolidar.js';
 import { guardar, huella, recuperar, vaciar } from './almacen.js';
 
@@ -45,7 +46,9 @@ export async function leerArchivos(files) {
 export async function cargar(archivos, alProgreso) {
   const resultados = await procesarEnWorker(archivos, alProgreso);
   const guardado = await guardar(archivos);
-  return { ...consolidar(resultados), resultados, guardado };
+  const datos = consolidar(resultados);
+  await asignarFacultades(datos.filas);
+  return { ...datos, resultados, guardado };
 }
 
 export async function restaurar() {

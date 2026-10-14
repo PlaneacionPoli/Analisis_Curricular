@@ -4,8 +4,8 @@ import { cmp } from '../data/util.js';
 import { aviso, columnas, COLORES, grafico, h, info, multiselect, selector, tabla, titulo } from '../ui.js';
 
 const TIPOS = ['Saber', 'SaberHacer', 'SaberSer'];
-const COLOR = { Saber: '#092196', SaberHacer: '#748BFC', SaberSer: '#A8B7FF' };
-const PALETA = ['#0F83FF', '#FF8B0F', '#FF0F83', '#0FBFFF', '#748BFC', '#0FFF8B', '#092196', '#A8B7FF'];
+const COLOR = { Saber: '#0F385A', SaberHacer: '#1FB2DE', SaberSer: '#FBAF17' };
+const PALETA = ['#1FB2DE', '#FBAF17', '#EC0677', '#0F385A', '#42F2F2', '#8A94A0', '#1565A7', '#C8E6F5'];
 
 // estado propio de la página (selección de la evolución por semestre y de la asignatura)
 const local = { programas: null, asignatura: null };
@@ -157,13 +157,13 @@ export function paginaTipoSaber({ todas, filas, etiqueta, seleccion, rerender })
     ]),
     h('hr'),
     h('h3', {}, 'Evolución de Tipo de Saber por semestre'),
-    h('p', { class: 'leyenda' }, '¿Cómo cambia el enfoque del aprendizaje a lo largo de la carrera? Se espera que los semestres avanzados ' +
+    h('p', { class: 'leyenda' }, '¿Cómo cambia el enfoque del aprendizaje a lo largo del plan de estudios? En general se espera que los semestres avanzados ' +
       'tengan mayor proporción de SaberHacer y SaberSer.'),
     seleccion ? null : multiselect('Seleccionar matrices:', ids.map(i => etiqueta.get(i)), local.programas.map(i => etiqueta.get(i)),
       v => { local.programas = ids.filter(i => v.includes(etiqueta.get(i))); }),
     seleccion ? null : h('button', { type: 'button', class: 'boton secundario', onclick: rerender }, 'Actualizar gráfico'),
     evolucion(filasSem),
-    h('p', { class: 'leyenda' }, 'Si SaberSer es muy bajo en todos los semestres, el programa puede estar descuidando la formación en valores y ciudadanía.'),
+    h('p', { class: 'leyenda' }, 'Un SaberSer bajo en todos los semestres indica poco énfasis en formación en valores y ciudadanía; conviene contrastarlo con el perfil de egreso.'),
     h('hr'),
     h('h3', {}, 'Tipo de Saber predominante por asignatura'),
     h('p', { class: 'leyenda' }, 'Distribución porcentual de cada tipo de saber por asignatura, ordenadas de mayor a menor SaberHacer.'),

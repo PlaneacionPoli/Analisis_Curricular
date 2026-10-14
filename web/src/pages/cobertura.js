@@ -51,27 +51,48 @@ function metricasMatriz(filasMatriz) {
 
 function barrasH(titulos, valores, completos, opciones = {}) {
   return grafico([{ type: 'bar', orientation: 'h', x: valores, y: titulos, customdata: completos,
-    hovertemplate: '<b>%{customdata}</b><br>%{x}<extra></extra>', marker: { color: valores, colorscale: 'Blues', showscale: false } }],
+    hovertemplate: '<b>%{customdata}</b><br>%{x}<extra></extra>', marker: { color: valores, colorscale: [[0, '#C8E6F5'], [1, '#0F385A']], showscale: false } }],
   { height: 600, yaxis: { autorange: 'reversed' }, margin: { l: 280, r: 20, t: 20, b: 50 }, xaxis: { title: opciones.etiqueta }, ...opciones.layout });
 }
 
-function mapaPresencia(filas, etiqueta, counter, excluidos) {
-  const top = [...counter].sort((a, b) => b[1] - a[1]).slice(0, 20).map(x => x[0]);
+/** Núcleo sin su sufijo de variante («Expansión A», «Expansión B»… → «Expansión»); solo para las gráficas, no para las métricas. */
+export function familiaNucleo(n) {
+  const base = String(n).replace(/\s+(?:[A-Z]|[IVX]{1,4}|\d{1,2})$/, '').trim();
+  return base.length >= 4 ? base : String(n);
+}
+
+/** Agrupa las variantes de un núcleo: familia → {menciones, variantes}. */
+function porFamilia(counter) {
+  const g = new Map();
+  for (const [n, c] of counter) {
+    const f = familiaNucleo(n);
+    if (!g.has(f)) g.set(f, { menciones: 0, variantes: [] });
+    const o = g.get(f); o.menciones += c; o.variantes.push(n);
+  }
+  return g;
+}
+
+/** Los 20 núcleos presentes en más matrices (variantes agrupadas): barras ordenadas, en lugar de un mapa de calor casi vacío. */
+function presenciaNucleos(filas, excluidos) {
   const nucs = nucleosPorFila(filas);
-  const ids = [...new Set(filas.map(f => f.Matriz))].sort((a, b) => cmp(etiqueta.get(a), etiqueta.get(b)));
-  const z = new Map(ids.map(i => [i, Object.fromEntries(top.map(n => [n, 0]))]));
-  filas.forEach((f, i) => nucs[i].forEach(n => { if (n in z.get(f.Matriz) && !excluidos.has(n)) z.get(f.Matriz)[n]++; }));
-  const matriz = ids.map(i => top.map(n => z.get(i)[n]));
+  const total = new Set(filas.map(f => f.Matriz)).size;
+  const porMatriz = new Map(), menciones = new Map();
+  filas.forEach((f, i) => nucs[i].forEach(n => {
+    if (excluidos.has(n)) return;
+    const k = familiaNucleo(n);
+    if (!porMatriz.has(k)) porMatriz.set(k, new Set());
+    porMatriz.get(k).add(f.Matriz);
+    menciones.set(k, (menciones.get(k) ?? 0) + 1);
+  }));
+  const top = [...porMatriz].map(([k, m]) => ({ k, m: m.size, menciones: menciones.get(k) }))
+    .sort((a, b) => b.m - a.m || b.menciones - a.menciones || cmp(a.k, b.k)).slice(0, 20);
   return [
-    grafico([{ type: 'heatmap', z: matriz, x: top.map(n => corto(n, 35)), y: ids.map(i => etiqueta.get(i)), colorscale: 'Blues',
-      text: matriz, texttemplate: '%{text}', customdata: ids.map(() => top), hovertemplate: '%{y}<br>%{customdata}<br>Menciones: %{z}<extra></extra>',
-      colorbar: { title: { text: 'Menciones' } } }],
-    { height: Math.max(300, ids.length * 40 + 220), xaxis: { tickangle: 45, title: 'Núcleo temático (top 20 más frecuentes)' }, margin: { l: 260, r: 20, t: 20, b: 220 } }),
-    h('details', {}, h('summary', {}, 'Ver nombres completos de los núcleos (referencia)'),
-      top.some(n => n.length > 35)
-        ? tabla(top.filter(n => n.length > 35).map(n => ({ Abreviado: corto(n, 35), 'Nombre completo': n })),
-          [{ title: 'Abreviado', field: 'Abreviado' }, { title: 'Nombre completo', field: 'Nombre completo' }], { height: false })
-        : h('p', { class: 'leyenda' }, 'Todos los nombres son cortos y se muestran completos.')),
+    grafico([{ type: 'bar', orientation: 'h', x: top.map(x => x.m), y: top.map(x => corto(x.k, 48)), customdata: top.map(x => [x.k, x.menciones]),
+      text: top.map(x => `${x.m} de ${total}`), textposition: 'outside', cliponaxis: false,
+      hovertemplate: '<b>%{customdata[0]}</b><br>En %{x} matrices<br>%{customdata[1]} menciones<extra></extra>',
+      marker: { color: top.map(x => x.m), colorscale: [[0, '#C8E6F5'], [1, '#0F385A']], showscale: false } }],
+    { height: Math.max(360, 28 * top.length + 80), yaxis: { autorange: 'reversed', automargin: true }, xaxis: { range: [0, total * 1.12], title: 'Matrices en las que aparece' },
+      margin: { l: 10, r: 60, t: 10, b: 50 } }),
   ];
 }
 
@@ -153,7 +174,7 @@ function mapaIntegracion(filas, etiqueta, seleccion, rerender) {
     df.forEach(r => { const i = sujetos.indexOf(r['Asignatura 1']), j = sujetos.indexOf(r['Asignatura 2']); z[i][j] = z[j][i] = r['Núcleos compartidos']; });
     bloques.push(h('hr'), h('h3', {}, 'Matriz de integración (núcleos compartidos)'),
       h('p', { class: 'leyenda' }, 'Cada celda muestra cuántos núcleos comparten dos asignaturas. Valores altos indican integración alta o posible redundancia.'),
-      grafico([{ type: 'heatmap', z, x: sujetos.map(s => corto(s, 30)), y: sujetos.map(s => corto(s, 30)), colorscale: 'Blues',
+      grafico([{ type: 'heatmap', z, x: sujetos.map(s => corto(s, 30)), y: sujetos.map(s => corto(s, 30)), colorscale: [[0, '#C8E6F5'], [1, '#0F385A']],
         colorbar: { title: { text: 'Núcleos comunes' } } }],
       { height: Math.max(400, sujetos.length * 18), xaxis: { tickangle: 45, tickfont: { size: 9 } }, yaxis: { tickfont: { size: 9 }, autorange: 'reversed' }, margin: { l: 200, b: 200, t: 20, r: 20 } }));
   }
@@ -188,7 +209,7 @@ export function paginaCobertura({ todas, filas, etiqueta, seleccion, rerender })
   const med = k => mediana(ref.map(r => r[k]));
   const nota = (k, fmt) => seleccion ? ` · mediana de las ${ref.length} matrices: ${fmt(med(k))}` : '';
 
-  const topN = [...cont].sort((a, b) => b[1] - a[1]).slice(0, 20);
+  const topN = [...porFamilia(cont)].map(([k, o]) => [k, o.menciones, o.variantes]).sort((a, b) => b[1] - a[1]).slice(0, 20);
   const topD = dens.slice(0, 20);
   const programas = [...new Set(vista.map(f => f.Matriz))].sort((a, b) => cmp(etiqueta.get(a), etiqueta.get(b)));
   const sel = seleccion ?? (programas.includes(local.programaSel) ? local.programaSel : programas[0]);
@@ -215,13 +236,14 @@ export function paginaCobertura({ todas, filas, etiqueta, seleccion, rerender })
       metrica('Diversidad temática', `${div.toFixed(1)}/100`, 'Entropía de Shannon normalizada. 100 = todos los temas con igual peso; 0 = un solo tema domina' + nota('diversidad', x => x.toFixed(1)))),
     seleccion ? h('p', { class: 'leyenda' }, `Mediana de las ${ref.length} matrices — núcleos únicos: ${med('unicos').toFixed(0)} · promedio por asignatura: ${med('densidad').toFixed(1)} · diversidad: ${med('diversidad').toFixed(1)}`) : null,
     h('hr'),
-    h('h3', {}, seleccion ? 'Presencia de núcleos temáticos (top 20)' : 'Presencia de núcleos temáticos por matriz (top 20)'),
-    h('p', { class: 'leyenda' }, 'Cada celda muestra cuántas veces aparece el núcleo en las filas de la matriz. Los más frecuentes (términos cortos) pueden provenir de asignaturas del bloque institucional compartido.'),
-    ...mapaPresencia(vista, etiqueta, cont, excluidos),
-    h('hr'),
+    ...(seleccion ? [] : [
+      h('h3', {}, 'Núcleos presentes en más matrices'),
+      h('p', { class: 'leyenda' }, 'Los 20 núcleos que aparecen en más matrices. Las variantes de un mismo núcleo (por ejemplo «Expansión A», «Expansión B») se agrupan en uno. Los más extendidos suelen venir del bloque institucional compartido.'),
+      ...presenciaNucleos(vista, excluidos),
+      h('hr')]),
     columnas(
       h('div', {}, h('h3', {}, 'Top 20 núcleos temáticos'),
-        h('p', { class: 'leyenda' }, 'Frecuencia = cuántas veces aparece el núcleo en todos los registros. Los muy cortos suelen ser temas generales del bloque institucional.'),
+        h('p', { class: 'leyenda' }, 'Frecuencia = cuántas veces aparece el núcleo en todos los registros, con sus variantes agrupadas. Los muy cortos suelen ser temas generales del bloque institucional.'),
         barrasH(topN.map(x => corto(x[0], 45)), topN.map(x => x[1]), topN.map(x => x[0]), { etiqueta: 'Menciones' })),
       h('div', {}, h('h3', {}, 'Densidad temática (top 20 asignaturas)'),
         h('p', { class: 'leyenda' }, 'Asignaturas con más núcleos declarados. Alta densidad = mayor explicitación; las muy densas pueden tener temas duplicados.'),
@@ -231,7 +253,7 @@ export function paginaCobertura({ todas, filas, etiqueta, seleccion, rerender })
     seleccion ? null : selector('Seleccionar matriz:', programas.map(i => etiqueta.get(i)), etiqueta.get(sel),
       v => { local.programaSel = programas.find(i => etiqueta.get(i) === v); rerender(); }),
     top15.length ? grafico([{ type: 'bar', x: top15.map(x => corto(x[0], 50)), y: top15.map(x => x[1]), customdata: top15.map(x => x[0]),
-      hovertemplate: '<b>%{customdata}</b><br>%{y}<extra></extra>', marker: { color: top15.map(x => x[1]), colorscale: 'Viridis', showscale: false } }],
+      hovertemplate: '<b>%{customdata}</b><br>%{y}<extra></extra>', marker: { color: top15.map(x => x[1]), colorscale: [[0, '#C8E6F5'], [1, '#0F385A']], showscale: false } }],
     { height: 450, xaxis: { tickangle: 45 }, yaxis: { title: 'Menciones' }, margin: { b: 200, t: 40, l: 50, r: 20 }, title: { text: `Top 15 núcleos temáticos — ${etiqueta.get(sel)}` } })
       : aviso('info', `No se encontraron núcleos temáticos para ${etiqueta.get(sel)}.`),
     botonDescarga('Descargar núcleos (CSV)', () => descargar('nucleos_frecuencia.csv',

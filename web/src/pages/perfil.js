@@ -222,7 +222,7 @@ function vistaMatriz(m, todas, rerender) {
     h('hr'),
     columnas(
       h('div', {}, h('h3', {}, 'Respaldo por capa'),
-        h('p', { class: 'leyenda' }, 'Porcentaje de los atributos de esta matriz respaldados por alguna competencia, RA o asignatura. El rombo es la mediana de las 50 matrices.'),
+        h('p', { class: 'leyenda' }, 'Porcentaje de los atributos de esta matriz respaldados por alguna competencia, RA o asignatura. El rombo es la mediana de todas las matrices cargadas.'),
         graficoCapas(ind, ref.length >= 3 ? [med('% Competencias'), med('% RA'), med('% Asignaturas')] : null)),
       h('div', {}, h('h3', {}, 'Estado por componente del perfil'),
         h('p', { class: 'leyenda' }, 'Cada barra es 100 % de los atributos del componente en esta matriz.'),
@@ -339,7 +339,7 @@ function vistaMetodo() {
   return h('div', {},
     h('p', {}, h('b', {}, 'Versión: '), c.VERSION, ' · ', h('b', {}, 'Huella SHA-256: '), h('code', {}, st.huella)),
     aviso('info', textoValidacion(c)),
-    h('p', { class: 'leyenda' }, 'La huella es idéntica a la que calcula la versión de Python: la misma configuración produce el mismo método en ambas.'),
+    h('p', { class: 'leyenda' }, 'La huella identifica de forma única esta configuración: con los mismos parámetros y sinónimos, el cálculo produce siempre el mismo resultado.'),
     h('h3', {}, 'Parámetros'),
     tabla([
       ['Umbral de cobertura explícita', c.PARAMS.explicita], ['Umbral de cobertura parcial', c.PARAMS.parcial],

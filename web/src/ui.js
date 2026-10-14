@@ -3,11 +3,11 @@ import Plotly from 'plotly.js-dist-min';
 import { TabulatorFull as Tabulator } from 'tabulator-tables';
 
 export const COLORES = {
-  sede: { 'Bogotá': '#0F83FF', 'Medellín': '#1565C0', Nacional: '#0FFF8B' },
-  modalidad: { Presencial: '#0F83FF', Virtual: '#748BFC', 'Híbrido': '#0FFF8B' },
-  nivel: { Pregrado: '#0F83FF', Posgrado: '#0FFF8B', 'No identificado': '#8c8c8c' },
-  paletaAzul: ['#092196', '#1A2663', '#748BFC', '#A8B7FF', '#DBE1FF'],
-  extra: ['#0F83FF', '#FF8B0F', '#FF0F83', '#0FBFFF', '#748BFC', '#0FFF8B'],
+  sede: { 'Bogotá': '#0F385A', 'Medellín': '#1FB2DE', Nacional: '#FBAF17' },
+  modalidad: { Presencial: '#1FB2DE', Virtual: '#0F385A', 'Híbrido': '#FBAF17' },
+  nivel: { Pregrado: '#1FB2DE', Posgrado: '#0F385A', 'No identificado': '#8A94A0' },
+  paletaAzul: ['#0F385A', '#1565A7', '#1FB2DE', '#42F2F2', '#C8E6F5'],
+  extra: ['#1FB2DE', '#FBAF17', '#EC0677', '#0F385A', '#42F2F2', '#8A94A0'],
 };
 
 /** Crea un elemento: h('div', {class:'x', onclick:fn}, hijo1, 'texto', …). */
@@ -107,11 +107,26 @@ export function grafico(trazas, layout = {}, config = {}) {
 }
 
 /** Tabla Tabulator. */
+// Columnas que identifican un programa o una matriz: ancho fijo y el nombre se parte en varias líneas en vez de estirar la tabla.
+const COLUMNAS_ETIQUETA = new Set(['Matriz', 'Programa', 'Nombre del programa', 'Etiqueta', 'Matriz / programa']);
+
+function ajustarColumnas(cols) {
+  return cols.map(c => {
+    if (c.columns) return { ...c, columns: ajustarColumnas(c.columns) };
+    if (COLUMNAS_ETIQUETA.has(c.field)) {
+      const { minWidth, ...resto } = c; void minWidth;
+      return { ...resto, width: c.width ?? 240, minWidth: 180, widthGrow: 0, cssClass: [c.cssClass, 'celda-etiqueta'].filter(Boolean).join(' ') };
+    }
+    if (c.width) return { ...c, cssClass: [c.cssClass, 'celda-etiqueta'].filter(Boolean).join(' ') }; // columnas de ancho fijo: el texto largo se parte
+    return c;
+  });
+}
+
 export function tabla(datos, columnasDef, opciones = {}) {
   const cont = h('div', { class: 'tabla' });
   queueMicrotask(() => new Tabulator(cont, {
     // sin rutas anidadas: varias columnas llevan punto en el nombre («Cr. Total», «B.Institucional») y Tabulator las leería como objetos
-    data: datos, columns: columnasDef, layout: 'fitDataStretch', placeholder: 'Sin registros', nestedFieldSeparator: false, ...opciones,
+    data: datos, columns: ajustarColumnas(columnasDef), layout: 'fitDataStretch', placeholder: 'Sin registros', nestedFieldSeparator: false, ...opciones,
   }));
   return cont;
 }

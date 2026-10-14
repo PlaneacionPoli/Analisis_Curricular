@@ -26,15 +26,21 @@ function pestanas(nombres, actual, alCambiar) {
   return h('div', { class: 'pestanas' }, ...nombres.map(n => h('button', { type: 'button', class: n === actual ? 'activa' : '', onclick: () => alCambiar(n) }, n)));
 }
 
-function mapaCalor(res, T, etiqueta, ids) {
-  const tids = Object.keys(T).sort((a, b) => ids.reduce((s, i) => s + (res.porMatriz[b].get(i)?.size ?? 0), 0) - ids.reduce((s, i) => s + (res.porMatriz[a].get(i)?.size ?? 0), 0));
-  const z = tids.map(t => ids.map(i => res.porMatriz[t].get(i)?.size ?? 0));
-  return grafico([{ type: 'heatmap', z, x: ids.map(i => corto(etiqueta.get(i), 30)), y: tids.map(t => corto(T[t].descripcion, 40)),
-    text: z.map(r => r.map(v => (v > 0 ? String(v) : ''))), texttemplate: '%{text}', textfont: { size: 9, color: 'white' }, hoverongaps: false,
-    colorscale: [[0, '#F0F4F8'], [0.01, '#C8E6F5'], [0.3, '#1FB2DE'], [0.7, '#1565A7'], [1, '#0F385A']],
-    colorbar: { title: { text: 'Asignaturas' }, thickness: 14, len: 0.8 }, hovertemplate: '<b>%{y}</b><br>%{x}<br>%{z} asignatura(s)<extra></extra>' }],
-  { height: Math.max(380, Math.max(28, Math.min(48, Math.floor(900 / tids.length))) * tids.length + 120),
-    margin: { l: 10, r: 20, t: 30, b: 160 }, xaxis: { tickangle: 40, tickfont: { size: 9 } }, yaxis: { tickfont: { size: 10 }, autorange: 'reversed' }, plot_bgcolor: 'white' });
+/**
+ * Matrices en filas y tendencias en columnas, con el % de asignaturas de cada matriz que abordan la tendencia.
+ * Con porcentajes las matrices de distinto tamaño son comparables, y con los nombres de las matrices a la izquierda se leen completos.
+ */
+function mapaCalor(porMatriz, T, etiqueta, ids) {
+  const tids = Object.keys(T).sort((a, b) => ids.reduce((s, i) => s + porMatriz[i].cobertura[b], 0) - ids.reduce((s, i) => s + porMatriz[i].cobertura[a], 0));
+  const z = ids.map(i => tids.map(t => Math.round(porMatriz[i].cobertura[t])));
+  const conteo = ids.map(i => tids.map(t => [porMatriz[i].conteo[t], porMatriz[i].total]));
+  return grafico([{ type: 'heatmap', z, x: tids.map(t => corto(T[t].descripcion, 24)), y: ids.map(i => etiqueta.get(i)), customdata: conteo, zmin: 0, zmax: 100, xgap: 2, ygap: 2,
+    text: z.map(r => r.map(v => (v > 0 ? String(v) : ''))), texttemplate: '%{text}', textfont: { size: 10 }, hoverongaps: false,
+    colorscale: [[0, '#F0F4F8'], [0.05, '#C8E6F5'], [0.3, '#1FB2DE'], [0.65, '#1565A7'], [1, '#0F385A']],
+    colorbar: { title: { text: '% de asignaturas' }, thickness: 12, len: 0.5 },
+    hovertemplate: '<b>%{y}</b><br>%{x}<br>%{z} % de las asignaturas (%{customdata[0]} de %{customdata[1]})<extra></extra>' }],
+  { height: Math.max(420, 26 * ids.length + 190), margin: { l: 10, r: 10, t: 10, b: 10 }, plot_bgcolor: 'white',
+    xaxis: { side: 'top', tickangle: -35, tickfont: { size: 10 }, automargin: true }, yaxis: { autorange: 'reversed', tickfont: { size: 10.5 }, automargin: true } });
 }
 
 function barrasCobertura(res, T) {
@@ -112,8 +118,8 @@ export function paginaTendencias({ todas, filas, etiqueta, seleccion, rerender }
 
   const global = h('div', {},
     h('h3', {}, seleccion ? 'Tendencias de la matriz' : 'Cobertura de tendencias por matriz'),
-    seleccion ? null : h('p', { class: 'leyenda' }, 'Cada celda muestra el número de asignaturas únicas que abordan la tendencia. Tonos más oscuros = mayor cobertura.'),
-    seleccion ? null : mapaCalor(res, T, etiqueta, ids),
+    seleccion ? null : h('p', { class: 'leyenda' }, 'Cada celda es el porcentaje de asignaturas de la matriz que abordan la tendencia (pasa el cursor para ver el número). Las tendencias están ordenadas de mayor a menor presencia en el conjunto; las celdas vacías indican que ninguna asignatura la aborda.'),
+    seleccion ? null : mapaCalor(Object.fromEntries(ids.map(i => [i, resumirTendencias(vista.filter(f => f.Matriz === i), aciertos)])), T, etiqueta, ids),
     h('hr'),
     columnas(
       h('div', {}, h('h3', {}, 'Cobertura por tendencia (% de asignaturas)'),
@@ -130,7 +136,7 @@ export function paginaTendencias({ todas, filas, etiqueta, seleccion, rerender }
     selector('Seleccionar tendencia:', tids.map(t => T[t].descripcion), T[local.tendencia].descripcion,
       v => { local.tendencia = tids.find(t => T[t].descripcion === v); rerender(); }),
     h('p', {}, h('b', {}, T[local.tendencia].descripcion), ` — presente en <b>${res.conteo[local.tendencia]} de ${res.total}</b> asignaturas (${res.cobertura[local.tendencia].toFixed(0)} % de cobertura)`.replace(/<\/?b>/g, '')),
-    botonDescarga('📥 Descargar Excel', () => excelTendencia(res, T, vista, local.tendencia)),
+    botonDescarga('Descargar listado (Excel)', () => excelTendencia(res, T, vista, local.tendencia)),
     detalleTendencia(res, T, etiqueta, local.tendencia));
 
   // vista «por matriz»
@@ -217,13 +223,13 @@ export function paginaConfigTendencias({ rerender }) {
       `${cfg.REGLA.contenido_min_puntos} puntos (término compuesto = ${cfg.REGLA.peso_termino_compuesto}; simple = ${cfg.REGLA.peso_termino_simple}). La coincidencia es por palabra completa y sin tildes. La regla se modifica en el JSON importado (clave «REGLA»).`),
     h('hr'),
     h('h3', {}, `Tendencias actuales (${Object.keys(T).length})`),
-    ...Object.entries(T).map(([id, t]) => h('details', {}, h('summary', {}, `${t.descripcion} (${t.keywords.length} keywords)`),
+    ...Object.entries(T).map(([id, t]) => h('details', {}, h('summary', {}, `${t.descripcion} (${t.keywords.length} palabras clave)`),
       h('p', {}, h('b', {}, 'ID: '), id), h('p', {}, h('b', {}, 'Color: '), t.color ?? '—', t.sector ? ` · Sector: ${t.sector}` : ''),
-      h('p', {}, h('b', {}, 'Keywords: '), t.keywords.join(', ')))),
+      h('p', {}, h('b', {}, 'Palabras clave: '), t.keywords.join(', ')))),
     h('hr'),
     h('h3', {}, 'Agregar nueva tendencia'),
     columnas(h('div', {}, h('label', {}, 'ID (sin espacios):'), f.id, h('label', {}, 'Descripción:'), f.desc),
-      h('div', {}, h('label', {}, 'Color:'), f.color, h('label', {}, 'Keywords (una por línea):'), f.kws)),
+      h('div', {}, h('label', {}, 'Color:'), f.color, h('label', {}, 'Palabras clave (una por línea):'), f.kws)),
     h('button', { type: 'button', class: 'boton', onclick: agregar }, 'Agregar tendencia'),
     h('hr'),
     h('h3', {}, 'Eliminar tendencia'),

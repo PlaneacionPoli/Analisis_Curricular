@@ -7,9 +7,9 @@ import { actualizar, obtener } from '../store.js';
 import { aviso, barraSegmentada, chip, columnas, COLORES, grafico, h, icono, kpi, panel, tabla } from '../ui.js';
 
 const ORDEN_MODALIDAD = ['Presencial', 'Virtual', 'Híbrido'];
-const COLOR_MOD = { Presencial: '#0F83FF', Virtual: '#0FD98B', 'Híbrido': '#FBAF17' };
+const COLOR_MOD = { Presencial: '#1FB2DE', Virtual: '#0F385A', 'Híbrido': '#FBAF17' };
 const COLOR_NIVEL = { Pregrado: '#0F385A', Posgrado: '#1FB2DE', 'No identificado': '#8A94A0' };
-const COLOR_SABER = { Saber: '#092196', SaberHacer: '#748BFC', SaberSer: '#A8B7FF' };
+const COLOR_SABER = { Saber: '#0F385A', SaberHacer: '#1FB2DE', SaberSer: '#FBAF17' };
 const TIPOS = ['Saber', 'SaberHacer', 'SaberSer'];
 const COLUMNAS_RESUMEN = ['Programa', 'Modalidad', 'Sede', 'Nivel', 'Asignaturas', 'Asig. Oficial', 'Semestres',
   'Cr. Total', 'B. Institucional', 'B. Disciplinar', 'B. Electivo', 'Suma bloques', 'Cr. Fundamentacion',

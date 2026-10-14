@@ -1,20 +1,27 @@
-// Página «Taxonomías»: lo que declara el Paso 3 (Bloom o BAK, dominio, nivel), su exigencia y su coherencia con la base de
-// verbos. Unidad: RA único por matriz. La referencia (mediana del índice de exigencia) es siempre la del conjunto cargado.
+// Página «Taxonomías»: lo que declaran los RA (dominio y nivel), su exigencia y si el verbo con que inician corresponde a lo declarado.
+// Unidad: RA único por matriz. La referencia (mediana del índice de exigencia) es siempre la del conjunto cargado.
 import * as XLSX from 'xlsx';
 import { baseVerbos, contrastar, DOMINIOS, ESTADOS, indiceExigencia, leerRA, porGrupo, resumenContraste } from '../data/taxonomias.js';
 import { ceder, cmp } from '../data/util.js';
 import { aviso, botonDescarga, columnas, descargar, grafico, h, info, metrica, multiselect, tabla, titulo } from '../ui.js';
 
-const COLOR_DOM = { Cognitivo: '#2E86C1', Procedimental: '#1E8449', Actitudinal: '#42F2F2', 'Sin dominio': '#BDC3C7' };
+// Paleta institucional: navy #0F385A, azul #1FB2DE, cian #42F2F2, dorado #FBAF17, magenta #EC0677 (gris para «sin dato»)
+const COLOR_DOM = { Cognitivo: '#0F385A', Procedimental: '#1FB2DE', Actitudinal: '#FBAF17', 'Sin dominio': '#8A94A0' };
 const COLOR_CONTRASTE = { Coincide: '#1FB2DE', 'Nivel difiere': '#FBAF17', 'Dominio difiere': '#EC0677', 'Verbo fuera de la base': '#8A94A0' };
-const ORDEN_NIVELES = ['conocimiento', 'comprension', 'aplicacion', 'analisis', 'sintesis', 'evaluacion', 'imitacion', 'manipulacion', 'precision',
-  'control', 'percepcion', 'responder', 'valorar', 'organizar', 'caracterizar'];
-const PESTANAS = ['Resumen', 'Dominio y nivel', 'Coherencia verbo–nivel', 'Verbos', 'Progresión', 'Explorar RA'];
+// nombres que ve el usuario (los datos y el Excel conservan los originales)
+const ETIQUETA = { Coincide: 'Coherente', 'Nivel difiere': 'Revisar nivel', 'Dominio difiere': 'Revisar dominio', 'Verbo fuera de la base': 'Verbo sin clasificar' };
+const NIVELES = {
+  Cognitivo: [['conocimiento', 'Conocimiento'], ['comprension', 'Comprensión'], ['aplicacion', 'Aplicación'], ['analisis', 'Análisis'], ['sintesis', 'Síntesis'], ['evaluacion', 'Evaluación']],
+  Procedimental: [['imitacion', 'Imitación'], ['manipulacion', 'Manipulación'], ['precision', 'Precisión'], ['control', 'Control']],
+  Actitudinal: [['percepcion', 'Percepción'], ['responder', 'Responder'], ['valorar', 'Valorar'], ['organizar', 'Organizar'], ['caracterizar', 'Caracterizar']],
+};
+const PESTANAS = ['Exigencia de los RA', 'Revisión de verbos', 'Listado de RA'];
 
-const local = { pestana: 'Resumen', cache: null, firma: '', cargando: false, avance: null, error: null, estados: ESTADOS.slice(1), prog: [], dom: [], texto: '' };
+const local = { pestana: PESTANAS[0], cache: null, firma: '', cargando: false, avance: null, error: null, estados: ['Nivel difiere', 'Dominio difiere'], prog: [], dom: [], texto: '' };
 const norm = t => String(t ?? '').normalize('NFKD').replace(/[^\x00-\x7f]/g, '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
 const mediana = v => { const s = v.filter(x => x != null).sort((a, b) => a - b); if (!s.length) return null; const m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 const fmt = x => (x == null ? '—' : x);
+const miles = n => n.toLocaleString('es-CO');
 
 async function leerTodas(archivos, alAvance = null) {
   const base = await baseVerbos();
@@ -44,20 +51,16 @@ async function calcular(archivos, rerender) {
   local.cargando = false; local.avance = null; rerender();
 }
 
-const BARRA = { height: 320, margin: { l: 10, r: 10, t: 10, b: 10 } };
-
 export function paginaTaxonomias({ filas, todasFilas, archivos, etiqueta, programaDe, seleccion, rerender }) {
   const cabecera = [...titulo('Taxonomías Curriculares'),
-    info('Cada <b>resultado de aprendizaje (RA) único</b> declara en el Paso 3 su taxonomía (<b>Bloom</b> o <b>BAK</b>), su dominio (cognitivo, ' +
-      'procedimental, actitudinal) y su nivel. Esta sección resume lo declarado, calcula el <b>índice de exigencia</b> y contrasta cada RA con la ' +
-      '<b>base de verbos</b> (646 verbos): ¿el dominio y el nivel declarados son coherentes con el verbo? El contraste es una propuesta para revisar ' +
-      'con el comité; un verbo puede admitir varias lecturas.')];
+    info('Cada resultado de aprendizaje (RA) declara en el Paso 3 su <b>dominio</b> (cognitivo, procedimental o actitudinal) y su <b>nivel</b>. Esta sección responde dos preguntas: ' +
+      '<b>¿qué tan exigentes son los RA declarados?</b> y <b>¿el verbo con que inicia cada RA corresponde a lo que declara?</b> El contraste es una propuesta para revisar con el comité; un verbo puede admitir varias lecturas.')];
   const firma = archivos.map(a => a.huella ?? a.nombre).join('|');
   if (local.firma !== firma) { local.firma = firma; local.cache = null; }
   if (!local.cache) {
     if (!local.cargando) calcular(archivos, rerender);
     return h('div', {}, ...cabecera, local.error ? aviso('error', local.error)
-      : aviso('info', `Leyendo las taxonomías declaradas en el Paso 3… ${local.avance ? `${local.avance[0]} de ${local.avance[1]} archivos` : ''}`));
+      : aviso('info', `Leyendo los RA del Paso 3… ${local.avance ? `${local.avance[0]} de ${local.avance[1]} archivos` : ''}`));
   }
 
   const vis = new Set(filas.map(f => f.Matriz));
@@ -68,102 +71,66 @@ export function paginaTaxonomias({ filas, todasFilas, archivos, etiqueta, progra
   const res = resumenContraste(ra);
   const porM = porGrupo(ra, 'Matriz');
   const refExig = mediana(porGrupo(todas, 'Matriz').map(x => x['Índice de exigencia']));
-  const pctTax = t => `${Math.round(100 * ra.filter(r => r['Taxonomía'] === t).length / ra.length)}%`;
+  const aRevisar = res.estados['Nivel difiere'] + res.estados['Dominio difiere'];
 
   const cuerpo = {
-    'Resumen': () => resumen(ra, porM, refExig, seleccion, etiqueta),
-    'Dominio y nivel': () => dominioNivel(ra),
-    'Coherencia verbo–nivel': () => coherencia(ra, res, rerender),
-    'Verbos': () => verbos(ra),
-    'Progresión': () => progresion(ra, todasFilas.filter(f => vis.has(f.Matriz) && (!seleccion || f.Matriz === seleccion))),
-    'Explorar RA': () => explorar(ra, rerender),
+    'Exigencia de los RA': () => exigencia(ra, porM, refExig, etiqueta, todasFilas.filter(f => vis.has(f.Matriz) && (!seleccion || f.Matriz === seleccion))),
+    'Revisión de verbos': () => revision(ra, res, etiqueta, rerender),
+    'Listado de RA': () => listado(ra, etiqueta, rerender),
   };
 
   return h('div', {}, ...cabecera,
     seleccion ? aviso('info', `<b>Vista de matriz:</b> ${etiqueta.get(seleccion)} (${ra.length} RA únicos). La referencia del índice es la mediana de las matrices cargadas.`) : null,
-    columnas(metrica('RA únicos', ra.length), metrica('Bloom', pctTax('Bloom')), metrica('BAK', pctTax('BAK')),
+    columnas(metrica('RA únicos', miles(ra.length)),
       metrica('Índice de exigencia', fmt(indiceExigencia(ra.map(r => r['Exigencia declarada']))),
-        '(nivel medio − 1) / 5 × 100, con cada nivel en la escala común de 1 a 6. Es descriptivo: la exigencia adecuada depende del nivel de formación.' +
-        (seleccion ? ` Mediana de las matrices: ${fmt(refExig)}.` : '')),
-      metrica('Coherentes con el verbo', `${(res.pct.Coincide ?? 0).toFixed(0)}%`, 'RA cuyo dominio y nivel declarados coinciden con los de la base para su verbo.')),
+        'Escala de 0 a 100: 0 es el nivel más básico y 100 el más alto de cada taxonomía. Es descriptivo; la exigencia adecuada depende del nivel de formación.' + (seleccion ? ` Mediana de las matrices: ${fmt(refExig)}.` : '')),
+      metrica('Verbo coherente con lo declarado', `${(res.pct.Coincide ?? 0).toFixed(0)} %`, 'RA cuyo dominio y nivel coinciden con los que la base de verbos asigna a su verbo.'),
+      metrica('RA por revisar', miles(aRevisar), 'Nivel o dominio distinto del que la base asigna al verbo.')),
     h('div', { class: 'pestanas' }, ...PESTANAS.map(p => h('button', { type: 'button', class: p === local.pestana ? 'activa' : '', onclick: () => { local.pestana = p; rerender(); } }, p))),
     cuerpo[local.pestana]());
 }
 
-function resumen(ra, porM, refExig, seleccion, etiqueta) {
-  const orden = [...porM].sort((a, b) => (a['Índice de exigencia'] ?? 0) - (b['Índice de exigencia'] ?? 0));
+function exigencia(ra, porM, refExig, etiqueta, filasDf) {
+  const orden = [...porM].filter(x => x['Índice de exigencia'] != null).sort((a, b) => a['Índice de exigencia'] - b['Índice de exigencia']);
   const mixtas = [...new Set(ra.map(r => r.Matriz))].filter(m => new Set(ra.filter(r => r.Matriz === m).map(r => r['Taxonomía'])).size > 1).length;
+  const pctBak = Math.round(100 * ra.filter(r => r['Taxonomía'] === 'BAK').length / ra.length);
+  const doms = DOMINIOS.filter(d => ra.some(r => r['Dominio declarado'] === d));
+  const progs = [...new Set(ra.map(r => r.Programa))].sort(cmp);
+
+  const niveles = d => {
+    const cuenta = new Map();
+    ra.filter(r => r['Dominio declarado'] === d).forEach(r => cuenta.set(r['Nivel declarado'], (cuenta.get(r['Nivel declarado']) ?? 0) + 1));
+    return NIVELES[d].map(([k, etq]) => ({ etq, n: cuenta.get(k) ?? 0 }));
+  };
+  const totalDom = d => ra.filter(r => r['Dominio declarado'] === d).length;
+
   return h('div', {},
     h('h3', {}, 'Índice de exigencia por matriz'),
-    h('p', { class: 'leyenda' }, 'Cada nivel declarado se traduce a una escala común de 1 a 6 según su posición en la progresión de su dominio (Bloom: 6 niveles; BAK procedimental: 4; ' +
-      'BAK actitudinal: 5). La equivalencia entre escalas es un supuesto del método. Color: % de RA con BAK.'),
+    h('p', { class: 'leyenda' }, 'Cada RA declara un nivel de su taxonomía (por ejemplo, Aplicación o Análisis). El índice lleva esos niveles a una escala común de 0 a 100 y promedia los de la matriz. ' +
+      `Úsalo para comparar matrices entre sí y con la mediana (línea punteada), no como una nota. Cuidado: las taxonomías con menos niveles (BAK procedimental y actitudinal) elevan el índice; ${pctBak} % de los RA usa BAK, y ${mixtas} matriz(ces) combinan Bloom y BAK.`),
     grafico([{ type: 'bar', orientation: 'h', x: orden.map(x => x['Índice de exigencia']), y: orden.map(x => etiqueta.get(x.Matriz) ?? x.Matriz),
-      marker: { color: orden.map(x => x['% BAK']), colorscale: [[0, '#0F385A'], [1, '#42F2F2']], colorbar: { title: { text: '% BAK' } } },
-      hovertemplate: '%{y}<br>Exigencia %{x}<extra></extra>' }],
-    { height: Math.max(300, 22 * orden.length + 100), xaxis: { range: [0, 100], title: 'Índice de exigencia' }, margin: { l: 280, r: 10, t: 10, b: 40 },
-      shapes: refExig == null ? [] : [{ type: 'line', x0: refExig, x1: refExig, yref: 'paper', y0: 0, y1: 1, line: { dash: 'dot', color: '#FBAF17', width: 2 } }] }),
-    h('p', { class: 'leyenda' }, `${mixtas} matriz(ces) combinan Bloom y BAK entre sus RA.` + (seleccion ? '' : ' Línea punteada = mediana de las matrices.')),
-    tabla(porM.map(x => ({ ...x, Matriz: etiqueta.get(x.Matriz) ?? x.Matriz })),
-      ['Matriz', 'RA únicos', '% Bloom', '% BAK', 'Índice de exigencia'].map(c => ({ title: c, field: c, ...(c === 'Matriz' ? { minWidth: 260 } : { hozAlign: 'right' }) })), { height: 360 }));
-}
-
-function dominioNivel(ra) {
-  const cuenta = new Map();
-  ra.forEach(r => { const d = r['Dominio declarado'] || 'Sin dominio'; cuenta.set(d, (cuenta.get(d) ?? 0) + 1); });
-  const niv = new Map();
-  ra.filter(r => r['Nivel declarado']).forEach(r => { const k = `${r['Dominio declarado'] || 'Sin dominio'}|${r['Nivel declarado']}`; niv.set(k, (niv.get(k) ?? 0) + 1); });
-  const niveles = [...new Set([...niv.keys()].map(k => k.split('|')[1]))].sort((a, b) => (ORDEN_NIVELES.indexOf(a) + 100) % 100 - (ORDEN_NIVELES.indexOf(b) + 100) % 100);
-  const doms = [...cuenta.keys()];
-  const progs = [...new Set(ra.map(r => r.Programa))].sort(cmp);
-  return h('div', {},
-    columnas(
-      h('div', {}, h('h3', {}, 'Dominio declarado'), grafico([{ type: 'pie', labels: [...cuenta.keys()], values: [...cuenta.values()], hole: 0.4, textinfo: 'label+percent',
-        marker: { colors: [...cuenta.keys()].map(d => COLOR_DOM[d] ?? '#BDC3C7') } }], { ...BARRA, height: 340, showlegend: false })),
-      h('div', {}, h('h3', {}, 'Nivel declarado por dominio'), grafico(doms.map(d => ({ type: 'bar', name: d, x: niveles, y: niveles.map(n => niv.get(`${d}|${n}`) ?? 0), marker: { color: COLOR_DOM[d] } })),
-        { ...BARRA, height: 340, barmode: 'stack', yaxis: { title: 'RA' } }))),
-    h('h3', {}, 'Composición por dominio en cada programa'),
+      text: orden.map(x => (x['% BAK'] > 0 ? `BAK ${Math.round(x['% BAK'])} %` : 'Bloom')), textposition: 'inside', insidetextanchor: 'start', textfont: { color: '#fff', size: 10 },
+      customdata: orden.map(x => [x['RA únicos'], x['% BAK']]), marker: { color: '#1FB2DE' },
+      hovertemplate: '<b>%{y}</b><br>Exigencia %{x}<br>%{customdata[0]} RA · %{customdata[1]} % con BAK<extra></extra>' }],
+    { height: Math.max(300, 24 * orden.length + 90), xaxis: { range: [0, 100], title: 'Índice de exigencia (0–100)' }, yaxis: { automargin: true, tickfont: { size: 10.5 } }, margin: { l: 10, r: 20, t: 20, b: 50 },
+      shapes: refExig == null ? [] : [{ type: 'line', x0: refExig, x1: refExig, yref: 'paper', y0: 0, y1: 1, line: { dash: 'dot', color: '#FBAF17', width: 2 } }],
+      annotations: refExig == null ? [] : [{ x: refExig, y: 1, yref: 'paper', text: `Mediana ${refExig.toFixed(0)}`, showarrow: false, yanchor: 'bottom', font: { color: '#8C6000', size: 11 } }] }),
+    h('hr'),
+    h('h3', {}, 'Niveles declarados en cada dominio'),
+    h('p', { class: 'leyenda' }, 'Cuántos RA declaran cada nivel, de menor a mayor complejidad dentro de su dominio. Si casi todos se concentran en los primeros niveles, los RA piden poco; ' +
+      'si se concentran en los últimos, conviene revisar si son alcanzables.'),
+    columnas(...doms.map(d => h('div', {}, h('b', {}, `${d} (${totalDom(d)} RA)`),
+      grafico([{ type: 'bar', x: niveles(d).map(x => x.etq), y: niveles(d).map(x => x.n), text: niveles(d).map(x => x.n || ''), textposition: 'outside', cliponaxis: false, marker: { color: COLOR_DOM[d] },
+        hovertemplate: '%{x}: %{y} RA<extra></extra>' }],
+      { height: 280, margin: { l: 40, r: 10, t: 20, b: 70 }, xaxis: { tickangle: -30 }, yaxis: { title: 'RA', rangemode: 'tozero' } })))),
+    h('hr'),
+    h('h3', {}, 'Dominios que desarrolla cada programa'),
+    h('p', { class: 'leyenda' }, 'Porcentaje de los RA de cada programa en cada dominio. Un programa sin RA actitudinales, o con muy pocos, puede estar dejando por fuera la formación en valores y actitudes.'),
     grafico(doms.map(d => ({ type: 'bar', orientation: 'h', name: d, y: progs, marker: { color: COLOR_DOM[d] },
-      x: progs.map(p => { const g = ra.filter(r => r.Programa === p); return 100 * g.filter(r => (r['Dominio declarado'] || 'Sin dominio') === d).length / g.length; }) })),
-    { height: Math.max(320, 24 * progs.length + 120), barmode: 'stack', xaxis: { range: [0, 100], ticksuffix: ' %' }, margin: { l: 280, r: 10, t: 10, b: 40 } }));
-}
-
-function coherencia(ra, res, rerender) {
-  const grupos = porGrupo(ra, 'Programa');
-  const rev = ra.filter(r => local.estados.includes(r.Contraste));
-  const cols = ['Matriz', 'Verbo', 'Taxonomía', 'Dominio declarado', 'Nivel declarado', 'Dominio(s) según la base', 'Nivel según la base', 'Diferencia de nivel (declarado − base)', 'Contraste', 'RA'];
-  return h('div', {},
-    h('h3', {}, '¿El dominio y el nivel declarados son coherentes con el verbo del RA?'),
-    h('p', { class: 'leyenda' }, 'Dominio: el declarado debe estar entre los que la base asigna al verbo. Nivel: si el dominio coincide, se compara el nivel declarado con el de la base en la escala común de 1 a 6 ' +
-      '(coincide si la diferencia es menor de 0,5). «Difiere» pide revisión, no declara un error.'),
-    columnas(...ESTADOS.map(e => metrica(e, `${res.estados[e]} (${(res.pct[e] ?? 0).toFixed(0)}%)`))),
-    grafico(ESTADOS.map(e => ({ type: 'bar', orientation: 'h', name: e, y: grupos.map(g => g.Programa), x: grupos.map(g => g[`% ${e}`]), marker: { color: COLOR_CONTRASTE[e] } })),
-      { height: Math.max(320, 24 * grupos.length + 120), barmode: 'stack', xaxis: { range: [0, 100], ticksuffix: ' %' }, margin: { l: 280, r: 10, t: 10, b: 40 } }),
-    multiselect('Mostrar RA con resultado', ESTADOS, local.estados, v => { local.estados = v; }),
-    h('button', { type: 'button', class: 'boton secundario', onclick: rerender }, 'Aplicar'),
-    h('p', { class: 'leyenda' }, `${rev.length} RA para revisar.`),
-    tabla(rev, cols.map(c => ({ title: c, field: c, ...(c === 'RA' ? { minWidth: 360, tooltip: true } : {}) })), { height: Math.min(520, 35 * rev.length + 60) }),
-    botonDescarga('Descargar el contraste (Excel)', () => {
-      const wb = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ra.map(({ clave, ...r }) => r)), 'Contraste');
-      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(grupos), 'Por programa');
-      descargar('taxonomias_contraste.xlsx', XLSX.write(wb, { bookType: 'xlsx', type: 'array' }), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
-    }));
-}
-
-function verbos(ra) {
-  const moda = a => { const c = new Map(); a.forEach(x => c.set(x, (c.get(x) ?? 0) + 1)); const m = Math.max(...c.values()); return [...c].filter(([, n]) => n === m).map(x => x[0]).sort()[0] ?? ''; };
-  const g = new Map();
-  ra.forEach(r => { const v = r.Verbo.toLowerCase(); if (!g.has(v)) g.set(v, []); g.get(v).push(r); });
-  const filas = [...g].map(([Verbo, d]) => ({ Verbo, RA: d.length, 'Dominio más declarado': moda(d.map(x => x['Dominio declarado'])), 'Nivel más declarado': moda(d.map(x => x['Nivel declarado'])),
-    'Dominio(s) según la base': moda(d.map(x => x['Dominio(s) según la base'])) })).sort((a, b) => b.RA - a.RA);
-  const top = filas.slice(0, 20).reverse();
-  const doms = [...new Set(top.map(x => x['Dominio más declarado'] || 'Sin dominio'))];
-  return h('div', {}, h('h3', {}, 'Verbos de los RA'),
-    h('p', { class: 'leyenda' }, 'Verbo con el que inicia cada RA (Paso 3), su frecuencia y el dominio y nivel que más se le declara.'),
-    grafico(doms.map(d => ({ type: 'bar', orientation: 'h', name: d, marker: { color: COLOR_DOM[d] ?? '#BDC3C7' },
-      y: top.filter(x => (x['Dominio más declarado'] || 'Sin dominio') === d).map(x => x.Verbo), x: top.filter(x => (x['Dominio más declarado'] || 'Sin dominio') === d).map(x => x.RA) })),
-    { height: 520, margin: { l: 120, r: 10, t: 10, b: 40 }, yaxis: { categoryorder: 'array', categoryarray: top.map(x => x.Verbo) } }),
-    tabla(filas, Object.keys(filas[0]).map(c => ({ title: c, field: c })), { height: 400 }));
+      x: progs.map(p => { const g = ra.filter(r => r.Programa === p); return 100 * g.filter(r => r['Dominio declarado'] === d).length / g.length; }),
+      hovertemplate: '%{y}<br>' + d + ': %{x:.0f} %<extra></extra>' })),
+    { height: Math.max(320, 24 * progs.length + 120), barmode: 'stack', xaxis: { range: [0, 100], ticksuffix: ' %' }, yaxis: { automargin: true, tickfont: { size: 10.5 } }, margin: { l: 10, r: 10, t: 10, b: 40 }, legend: { orientation: 'h', y: 1.04 } }),
+    progresion(ra, filasDf));
 }
 
 function progresion(ra, filasDf) {
@@ -177,21 +144,53 @@ function progresion(ra, filasDf) {
     if (vistos.has(key)) continue;
     vistos.add(key);
     const r = clavePorMatriz.get(`${f.Matriz}|${c}`);
-    if (r) sem.push({ s, dom: r['Dominio declarado'], ex: r['Exigencia declarada'] });
+    if (r) sem.push({ s, ex: r['Exigencia declarada'] });
   }
-  if (!sem.length) return aviso('info', 'No se pudo vincular los RA del Paso 3 con los semestres del Paso 5.');
+  if (!sem.length) return null;
   const semestres = [...new Set(sem.map(x => x.s))].sort((a, b) => a - b);
-  const doms = [...new Set(sem.map(x => x.dom || 'Sin dominio'))];
-  return h('div', {}, h('h3', {}, 'Progresión por semestre'),
-    h('p', { class: 'leyenda' }, 'Exigencia y dominio de los RA declarados según el semestre en que se trabajan las asignaturas (Paso 5). Cada RA cuenta una vez por matriz y semestre.'),
-    grafico([{ type: 'scatter', mode: 'lines+markers', x: semestres, y: semestres.map(s => indiceExigencia(sem.filter(x => x.s === s).map(x => x.ex))) }],
-      { height: 320, yaxis: { range: [0, 100], title: 'Índice de exigencia' }, xaxis: { title: 'Semestre', dtick: 1 }, margin: { l: 50, r: 10, t: 10, b: 40 } }),
-    grafico(doms.map(d => ({ type: 'bar', name: d, x: semestres, marker: { color: COLOR_DOM[d] ?? '#BDC3C7' },
-      y: semestres.map(s => { const g = sem.filter(x => x.s === s); return 100 * g.filter(x => (x.dom || 'Sin dominio') === d).length / g.length; }) })),
-    { height: 320, barmode: 'stack', yaxis: { range: [0, 100], ticksuffix: ' %' }, xaxis: { title: 'Semestre', dtick: 1 }, margin: { l: 50, r: 10, t: 10, b: 40 } }));
+  return h('div', {}, h('hr'), h('h3', {}, '¿Crece la exigencia a lo largo del plan de estudios?'),
+    h('p', { class: 'leyenda' }, 'Índice de exigencia de los RA según el semestre en que se trabajan las asignaturas (Paso 5). En general se espera que suba en los semestres avanzados.'),
+    grafico([{ type: 'scatter', mode: 'lines+markers', x: semestres, y: semestres.map(s => indiceExigencia(sem.filter(x => x.s === s).map(x => x.ex))), line: { color: '#0F385A', width: 3 }, marker: { color: '#1FB2DE', size: 9 },
+      hovertemplate: 'Semestre %{x}: %{y}<extra></extra>' }],
+    { height: 300, yaxis: { range: [0, 100], title: 'Índice de exigencia' }, xaxis: { title: 'Semestre', dtick: 1 }, margin: { l: 50, r: 10, t: 10, b: 40 } }));
 }
 
-function explorar(ra, rerender) {
+function revision(ra, res, etiqueta, rerender) {
+  const rev = ra.filter(r => local.estados.includes(r.Contraste));
+  const grupos = porGrupo(ra, 'Programa');
+  const top = grupos.map(g => ({ p: g.Programa, nivel: Math.round(g['% Nivel difiere'] * g['RA únicos'] / 100), dominio: Math.round(g['% Dominio difiere'] * g['RA únicos'] / 100) }))
+    .filter(x => x.nivel + x.dominio > 0).sort((a, b) => b.nivel + b.dominio - (a.nivel + a.dominio)).slice(0, 12).reverse();
+  const decl = r => (r['Dominio declarado'] ? `${r['Dominio declarado']} · ${r['Nivel declarado'] || 'sin nivel'}` : 'Sin dominio');
+  const base = r => (r['Dominio(s) según la base'] ? `${r['Dominio(s) según la base']} · ${r['Nivel según la base'] || '—'}` : 'No está en la base');
+  const filasTabla = rev.map(r => ({ Matriz: etiqueta.get(r.Matriz) ?? r.Matriz, RA: r.RA, Verbo: r.Verbo, 'Lo que declara': decl(r), 'Lo que indica el verbo': base(r), Resultado: ETIQUETA[r.Contraste] }));
+  const colorEstado = c => { const v = c.getValue(), k = Object.keys(ETIQUETA).find(e => ETIQUETA[e] === v); c.getElement().style.color = COLOR_CONTRASTE[k] ?? '#0F385A'; c.getElement().style.fontWeight = 'bold'; return v; };
+
+  return h('div', {},
+    h('h3', {}, '¿El verbo del RA corresponde al dominio y al nivel que declara?'),
+    h('p', { class: 'leyenda' }, 'Cada RA inicia con un verbo (por ejemplo, «Analizar» o «Diseñar»). La base institucional de verbos indica en qué dominio y nivel se ubica. Se compara con lo que el RA declara en el Paso 3. ' +
+      '«Revisar» no significa que el RA esté mal: indica que declaración y verbo no coinciden y conviene validarlo con el programa.'),
+    columnas(...ESTADOS.map(e => metrica(ETIQUETA[e], `${miles(res.estados[e])} (${(res.pct[e] ?? 0).toFixed(0)} %)`,
+      { Coincide: 'Dominio y nivel coinciden con la base.', 'Nivel difiere': 'Mismo dominio, otro nivel.', 'Dominio difiere': 'El verbo pertenece a otro dominio.', 'Verbo fuera de la base': 'La base no tiene este verbo.' }[e]))),
+    top.length ? h('div', {}, h('h3', {}, 'Programas con más RA por revisar'),
+      grafico([{ type: 'bar', orientation: 'h', name: ETIQUETA['Nivel difiere'], y: top.map(x => x.p), x: top.map(x => x.nivel), marker: { color: COLOR_CONTRASTE['Nivel difiere'] } },
+        { type: 'bar', orientation: 'h', name: ETIQUETA['Dominio difiere'], y: top.map(x => x.p), x: top.map(x => x.dominio), marker: { color: COLOR_CONTRASTE['Dominio difiere'] } }],
+      { height: Math.max(260, 28 * top.length + 100), barmode: 'stack', xaxis: { title: 'RA por revisar' }, yaxis: { automargin: true, tickfont: { size: 10.5 } }, margin: { l: 10, r: 10, t: 10, b: 50 }, legend: { orientation: 'h', y: 1.1 } })) : null,
+    h('h3', {}, 'RA por revisar'),
+    multiselect('Mostrar', ESTADOS.map(e => ETIQUETA[e]), local.estados.map(e => ETIQUETA[e]), v => { local.estados = ESTADOS.filter(e => v.includes(ETIQUETA[e])); }),
+    h('button', { type: 'button', class: 'boton secundario', onclick: rerender }, 'Aplicar'),
+    h('p', { class: 'leyenda' }, `${miles(rev.length)} RA con el resultado elegido. Pasa el cursor sobre el texto del RA para leerlo completo.`),
+    filasTabla.length ? tabla(filasTabla, [{ title: 'Matriz', field: 'Matriz' }, { title: 'Verbo', field: 'Verbo', width: 110 }, { title: 'RA', field: 'RA', minWidth: 340, tooltip: true },
+      { title: 'Lo que declara', field: 'Lo que declara', width: 190 }, { title: 'Lo que indica el verbo', field: 'Lo que indica el verbo', width: 210 }, { title: 'Resultado', field: 'Resultado', width: 150, formatter: colorEstado }],
+    { height: Math.min(520, 46 * Math.min(filasTabla.length, 10) + 60) }) : aviso('success', 'No hay RA con el resultado elegido.'),
+    botonDescarga('Descargar el contraste (Excel)', () => {
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(ra.map(({ clave, ...r }) => r)), 'Contraste');
+      XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(grupos), 'Por programa');
+      descargar('taxonomias_contraste.xlsx', XLSX.write(wb, { bookType: 'xlsx', type: 'array' }), 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    }));
+}
+
+function listado(ra, etiqueta, rerender) {
   const progs = [...new Set(ra.map(r => r.Programa))].sort(cmp);
   const caja = h('input', { type: 'text', value: local.texto, placeholder: 'Buscar en el texto del RA',
     onkeydown: e => { if (e.key === 'Enter') { local.texto = e.target.value; rerender(); } } });
@@ -199,11 +198,13 @@ function explorar(ra, rerender) {
   if (local.prog.length) v = v.filter(r => local.prog.includes(r.Programa));
   if (local.dom.length) v = v.filter(r => local.dom.includes(r['Dominio declarado']));
   if (local.texto.trim()) v = v.filter(r => r.RA.toLowerCase().includes(local.texto.trim().toLowerCase()));
-  const cols = ['Matriz', 'Verbo', 'Taxonomía', 'Dominio declarado', 'Nivel declarado', 'Tipo de saber', 'Contraste', 'RA'];
-  return h('div', {}, h('h3', {}, 'Explorar resultados de aprendizaje'),
+  const filasTabla = v.map(r => ({ Matriz: etiqueta.get(r.Matriz) ?? r.Matriz, Verbo: r.Verbo, Dominio: r['Dominio declarado'] || '—', Nivel: r['Nivel declarado'] || '—', Verificación: ETIQUETA[r.Contraste], RA: r.RA }));
+  return h('div', {}, h('h3', {}, 'Listado de resultados de aprendizaje'),
+    h('p', { class: 'leyenda' }, 'Todos los RA de la vista con su dominio, nivel y verificación del verbo. Filtra por programa o dominio, o busca una palabra del RA.'),
     columnas(multiselect('Programa', progs, local.prog, x => { local.prog = x; }),
-      multiselect('Dominio declarado', DOMINIOS, local.dom, x => { local.dom = x; }), h('div', { class: 'campo' }, h('label', {}, 'Buscar (Enter)'), caja)),
+      multiselect('Dominio', DOMINIOS, local.dom, x => { local.dom = x; }), h('div', { class: 'campo' }, h('label', {}, 'Buscar (Enter)'), caja)),
     h('button', { type: 'button', class: 'boton secundario', onclick: () => { local.texto = caja.value; rerender(); } }, 'Aplicar filtros'),
-    h('p', { class: 'leyenda' }, `${v.length} de ${ra.length} RA.`),
-    tabla(v, cols.map(c => ({ title: c, field: c, ...(c === 'RA' ? { minWidth: 400, tooltip: true } : {}) })), { height: 520 }));
+    h('p', { class: 'leyenda' }, `${miles(v.length)} de ${miles(ra.length)} RA.`),
+    tabla(filasTabla, [{ title: 'Matriz', field: 'Matriz' }, { title: 'Verbo', field: 'Verbo', width: 110 }, { title: 'Dominio', field: 'Dominio', width: 130 }, { title: 'Nivel', field: 'Nivel', width: 130 },
+      { title: 'Verificación', field: 'Verificación', width: 150 }, { title: 'RA', field: 'RA', minWidth: 360, tooltip: true }], { height: 520 }));
 }

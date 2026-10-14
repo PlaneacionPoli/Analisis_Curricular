@@ -27,9 +27,9 @@ const PAGINAS = [
   ['Perfil de Egreso (V1)', 'person-check', 'Asociación del perfil con competencias, RA y asignaturas', 4, true],
   ['Cobertura Temática', 'map', 'Núcleos temáticos: diversidad y densidad por programa', 2, true],
   ['Tendencias Globales', 'graph-up-arrow', 'Alineación con IA, Sostenibilidad, Innovación, etc.', 2, true],
-  ['Minería de Texto', 'search', 'Términos clave, similitud y frases frecuentes', 2, true],
   ['Taxonomías', 'diagram-3', 'Taxonomías, niveles de verbos y exigencia de los RA', 2, true],
   ['Familias Curriculares', 'diagram-2', 'Clustering jerárquico y familias de programas', 5, true],
+  ['Minería de Texto', 'search', 'Asignaturas con contenido parecido y dónde se trabaja un tema', 2, true],
   ['Configurar Tendencias', 'sliders', 'Personalizar las tendencias globales a detectar', 2, true],
   ['Explorar Datos', 'table', 'Explorar y filtrar los registros cargados', 1],
 ];
@@ -43,7 +43,7 @@ async function procesar(archivos, rechazados = []) {
   if (!datos.guardado) avisos.push('Este navegador no permite guardar las matrices: tendrás que volver a cargarlas al recargar la página.');
   actualizar({
     archivos, datos, progreso: null,
-    filtros: { programa: 'Todos', modalidad: 'Todos', sede: 'Todos', nivel: 'Todos' },
+    filtros: { facultad: 'Todos', programa: 'Todos', modalidad: 'Todos', sede: 'Todos', nivel: 'Todos' },
     mensaje: avisos.length ? { tipo: 'warning', texto: avisos.join('<br>') } : null,
   });
 }
@@ -61,7 +61,7 @@ async function cambiarArchivos() {
   await olvidar();
   reiniciarPerfil();
   actualizar({ archivos: null, datos: null, mensaje: null, matriz: null,
-    filtros: { programa: 'Todos', modalidad: 'Todos', sede: 'Todos', nivel: 'Todos' } });
+    filtros: { facultad: 'Todos', programa: 'Todos', modalidad: 'Todos', sede: 'Todos', nivel: 'Todos' } });
 }
 
 /** Matrices (programa-sede) del consolidado, con su archivo de origen. */
@@ -79,7 +79,7 @@ function listaMatrices() {
 function barraLateral(hayDatos) {
   const { pagina, datos, filtros } = obtener();
   const actual = PAGINAS.find(p => p[0] === pagina);
-  const programas = datos ? [...new Set(datos.filas.map(f => f.Programa).filter(Boolean))].sort(cmp) : [];
+  const programas = datos ? [...new Set(datos.filas.filter(f => !filtros.facultad || filtros.facultad === 'Todos' || f.Facultad === filtros.facultad).map(f => f.Programa).filter(Boolean))].sort(cmp) : [];
   return h('aside', { class: 'lateral' },
     h('img', { class: 'logo', src: `${import.meta.env.BASE_URL}logo_poli.png`, alt: 'Politécnico Grancolombiano' }),
     h('h2', {}, 'Configuración'),
@@ -110,9 +110,12 @@ function filtrosGlobales() {
   const valores = col => ['Todos', ...[...new Set(datos.filas.map(f => f[col]).filter(v => v != null))].map(String).sort(cmp)];
   const campo = (etiqueta, col, clave) => selector(etiqueta, valores(col), filtros[clave],
     v => actualizar({ filtros: { ...filtros, [clave]: v }, matriz: null }));
+  // al cambiar de facultad se limpia el programa elegido (podría no pertenecer a ella)
+  const facultad = selector('Facultad', valores('Facultad'), filtros.facultad ?? 'Todos',
+    v => actualizar({ filtros: { ...filtros, facultad: v, programa: 'Todos' }, matriz: null }));
   return h('section', { class: 'filtros' }, h('b', {}, icono('funnel'), ' Filtros'),
-    h('div', { class: 'columnas', style: { '--n': 3 } },
-      campo('Modalidad', 'Modalidad', 'modalidad'), campo('Sede', 'Sede', 'sede'), campo('Nivel', 'Nivel', 'nivel')));
+    h('div', { class: 'columnas', style: { '--n': 4 } },
+      facultad, campo('Modalidad', 'Modalidad', 'modalidad'), campo('Sede', 'Sede', 'sede'), campo('Nivel', 'Nivel', 'nivel')));
 }
 
 function contenido() {
@@ -191,7 +194,7 @@ function contenido() {
     const ids = new Set(filas.map(f => f.Matriz));
     const m = obtener().matriz;
     const f = obtener().filtros;
-    const activos = Object.entries({ Programa: f.programa, Modalidad: f.modalidad, Sede: f.sede, Nivel: f.nivel }).filter(([, v]) => v && v !== 'Todos').map(([k, v]) => `${k}: ${v}`);
+    const activos = Object.entries({ Facultad: f.facultad, Programa: f.programa, Modalidad: f.modalidad, Sede: f.sede, Nivel: f.nivel }).filter(([, v]) => v && v !== 'Todos').map(([k, v]) => `${k}: ${v}`);
     bloques.push(paginaResumen({ filas, todasFilas: datos.filas, archivos, archivoDe: new Map(todas.map(x => [x.id, x.archivo])), etiqueta: new Map(todas.map(x => [x.id, x.etiqueta])),
       seleccion: m && ids.has(m) ? m : null, descripcionFiltros: 'Filtros: ' + (activos.length ? activos.join('; ') : 'ninguno (conjunto completo)'), rerender: render }));
   }

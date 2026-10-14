@@ -159,7 +159,7 @@ export function paginaIndicadores({ filas, archivos, archivoDe, etiqueta, selecc
   const vista = agregar(seleccion ? evalVista.filter(m => m.matriz === seleccion) : evalVista, local.v1);
   const ref = referenciasConjunto(todo.por_matriz);
   const avisos = incrustada ? [] : [
-    ...errores.map(e => aviso('warning', `❌ <b>${e.archivo}</b>: ${e.causa}`)),
+    ...errores.map(e => aviso('warning', `No se pudo evaluar <b>${e.archivo}</b>: ${e.causa}`)),
     panelV1({ archivoDe, faltan: [...archivoDe].filter(([id, a]) => a && !local.enCache.has(id)).length, rerender }),
   ];
   if (!vista.globales.matrices) return h('div', {}, ...cab, ...avisos, aviso('warning', 'Ninguna matriz de la vista tiene los Pasos 2, 3 y 4 legibles.'));
