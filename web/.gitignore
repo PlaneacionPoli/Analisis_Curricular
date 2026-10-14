@@ -1,0 +1,13 @@
+node_modules/
+dist/
+# Datos institucionales: las matrices NUNCA se versionan
+*.xlsx
+*.xls
+*.csv
+tests/referencia.json
+tests/golden_*.json
+tests/lexico_sin_heldout.json
+tests/*.log
+tools/*.log
+# motor WASM copiado en cada build (scripts/copiar_wasm.mjs)
+public/ort/

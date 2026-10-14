@@ -1,0 +1,616 @@
+{
+ "VERSION": "1.0",
+ "DESCRIPCION": "Método de asociación del perfil (V1). Calibrado con 11 matrices (429 atributos, 1.287 decisiones): acuerdo 80,1 %, kappa 0,44. Ampliable por la institución.",
+ "MODELO_SEMANTICO": "paraphrase-multilingual-MiniLM-L12-v2",
+ "PARAMS": {
+  "explicita": 0.25,
+  "parcial": 0.05,
+  "semantica": 0.58,
+  "nucleo": false
+ },
+ "FACTOR_ROL": 0.5,
+ "PESO_NUCLEO": 3.0,
+ "UMBRAL_CONTEXTO": 0.15,
+ "PESO_CONTEXTO": 0.25,
+ "RAIZ": 6,
+ "SINONIMOS": {
+  "abogado": [
+   "derecho",
+   "juridico"
+  ],
+  "actuar": [
+   "actuacion"
+  ],
+  "adopcion": [
+   "familia",
+   "familiar"
+  ],
+  "agroturismo": [
+   "rural",
+   "turismo"
+  ],
+  "alcaldia": [
+   "estado",
+   "estatal",
+   "gobierno",
+   "publica",
+   "publico",
+   "territorial"
+  ],
+  "algoritmo": [
+   "algoritmia"
+  ],
+  "aportar": [
+   "aporte"
+  ],
+  "asesor": [
+   "asesorar",
+   "asesoria",
+   "consultoria",
+   "orientar"
+  ],
+  "asesorar": [
+   "asesoria",
+   "consultoria",
+   "orientar",
+   "recomendacion",
+   "recomendar"
+  ],
+  "asesoria": [
+   "asesorar",
+   "consultoria"
+  ],
+  "audiovisual": [
+   "cine",
+   "multimedia",
+   "video"
+  ],
+  "bar": [
+   "bebida",
+   "coctel"
+  ],
+  "ciencia": [
+   "stem"
+  ],
+  "cierre": [
+   "liquidacion",
+   "terminacion"
+  ],
+  "community": [
+   "comunidad",
+   "red",
+   "social"
+  ],
+  "comunidad": [
+   "comunitario",
+   "poblacion",
+   "territorio"
+  ],
+  "conciliacion": [
+   "conflicto",
+   "mediacion",
+   "negociacion"
+  ],
+  "conciliador": [
+   "conciliacion",
+   "conflicto",
+   "mediacion",
+   "negociacion"
+  ],
+  "conciliar": [
+   "conflicto",
+   "mediacion",
+   "negociacion"
+  ],
+  "consultoria": [
+   "asesorar",
+   "asesoria",
+   "consultor",
+   "consultorio"
+  ],
+  "coordinar": [
+   "coordinacion",
+   "gestion",
+   "gestionar",
+   "organizar"
+  ],
+  "copy": [
+   "copywriting",
+   "redaccion",
+   "redactar",
+   "texto"
+  ],
+  "corporativo": [
+   "empresa",
+   "empresarial",
+   "organizacion",
+   "organizacional"
+  ],
+  "crear": [
+   "creacion",
+   "creativo",
+   "disenar",
+   "diseno"
+  ],
+  "curriculo": [
+   "curricular",
+   "plan de estudio"
+  ],
+  "custodia": [
+   "familia",
+   "familiar"
+  ],
+  "dato": [
+   "base de dato",
+   "informacion"
+  ],
+  "departamental": [
+   "estado",
+   "estatal",
+   "gobierno",
+   "publica",
+   "publico",
+   "territorial"
+  ],
+  "departamento": [
+   "area",
+   "dependencia"
+  ],
+  "descentralizada": [
+   "estado",
+   "estatal",
+   "gobierno",
+   "publica",
+   "publico",
+   "territorial"
+  ],
+  "dirigir": [
+   "direccion",
+   "liderar",
+   "liderazgo"
+  ],
+  "discapacidad": [
+   "diversidad",
+   "inclusion",
+   "inclusivo"
+  ],
+  "disenar": [
+   "creacion",
+   "crear",
+   "disenador",
+   "diseno"
+  ],
+  "docencia": [
+   "docente",
+   "ensenanza",
+   "ensenar",
+   "pedagogia",
+   "pedagogico"
+  ],
+  "docente": [
+   "docencia",
+   "ensenanza",
+   "maestro",
+   "profesor"
+  ],
+  "ejecutar": [
+   "ejecucion"
+  ],
+  "emprender": [
+   "emprendimiento",
+   "intraemprendimiento"
+  ],
+  "emprendimiento": [
+   "emprender",
+   "intraemprendimiento"
+  ],
+  "ensenanza": [
+   "didactica",
+   "docencia",
+   "ensenar",
+   "pedagogia"
+  ],
+  "equipo": [
+   "colaborativo",
+   "grupo"
+  ],
+  "estudiante": [
+   "alumno",
+   "aprendiz",
+   "educando"
+  ],
+  "excepcional": [
+   "inclusion",
+   "inclusivo"
+  ],
+  "feria": [
+   "evento",
+   "exposicion"
+  ],
+  "financiero": [
+   "finanza"
+  ],
+  "finanza": [
+   "financiar",
+   "financiera",
+   "financiero"
+  ],
+  "firma": [
+   "empresa"
+  ],
+  "fundacion": [
+   "comunitario",
+   "solidario"
+  ],
+  "gerencia": [
+   "administracion",
+   "gerenciar",
+   "gestion",
+   "gestionar"
+  ],
+  "gerenciar": [
+   "administracion",
+   "administrar",
+   "gerencia",
+   "gestion",
+   "gestionar"
+  ],
+  "gestor": [
+   "gestion",
+   "gestionar"
+  ],
+  "gobernacion": [
+   "estado",
+   "estatal",
+   "gobierno",
+   "publica",
+   "publico",
+   "territorial"
+  ],
+  "grafico": [
+   "grafica",
+   "visual"
+  ],
+  "gubernamental": [
+   "estado",
+   "estatal",
+   "gobierno",
+   "publica",
+   "publico",
+   "territorial"
+  ],
+  "hotel": [
+   "alojamiento",
+   "hoteleria",
+   "hotelero"
+  ],
+  "indumentaria": [
+   "moda",
+   "prenda",
+   "vestuario"
+  ],
+  "infancia": [
+   "infantil",
+   "nino"
+  ],
+  "infantil": [
+   "infancia",
+   "nino"
+  ],
+  "infraestructura": [
+   "arquitectura",
+   "plataforma"
+  ],
+  "ingenieria": [
+   "stem"
+  ],
+  "legal": [
+   "juridico",
+   "legislacion",
+   "ley",
+   "norma",
+   "normativa",
+   "normatividad",
+   "normativo"
+  ],
+  "liderar": [
+   "direccion",
+   "dirigir",
+   "liderazgo"
+  ],
+  "manager": [
+   "gerencia",
+   "gerenciar",
+   "gerente"
+  ],
+  "matematica": [
+   "stem"
+  ],
+  "medio": [
+   "medios de comunicacion"
+  ],
+  "ministerio": [
+   "estado",
+   "estatal",
+   "gobierno",
+   "publica",
+   "publico",
+   "territorial"
+  ],
+  "mipyme": [
+   "mediano",
+   "micro",
+   "pequeno"
+  ],
+  "multicultural": [
+   "cultural",
+   "diversidad",
+   "intercultural"
+  ],
+  "nino": [
+   "infancia",
+   "infantil",
+   "nina",
+   "primera infancia"
+  ],
+  "no_gubernamentales": [
+   "comunitario",
+   "solidario"
+  ],
+  "normativa": [
+   "juridico",
+   "legal",
+   "legislacion",
+   "norma",
+   "normatividad",
+   "normativo"
+  ],
+  "normatividad": [
+   "juridico",
+   "legal",
+   "legislacion",
+   "norma",
+   "normativa",
+   "normativo"
+  ],
+  "ongs": [
+   "comunitario",
+   "solidario"
+  ],
+  "parental": [
+   "familia",
+   "familiar"
+  ],
+  "pauta": [
+   "anuncio",
+   "medio",
+   "publicitario"
+  ],
+  "pedagogia": [
+   "didactica",
+   "ensenanza",
+   "pedagogico"
+  ],
+  "periodismo": [
+   "informativo",
+   "noticia",
+   "periodistico"
+  ],
+  "plan": [
+   "planeacion",
+   "planear",
+   "planificacion",
+   "planificar"
+  ],
+  "plurilingue": [
+   "diversidad",
+   "lengua",
+   "linguistico"
+  ],
+  "poblacion": [
+   "comunidad",
+   "grupo"
+  ],
+  "programacion": [
+   "codigo",
+   "programar",
+   "software"
+  ],
+  "prototipo": [
+   "modelo",
+   "prototipado",
+   "prototipar"
+  ],
+  "publica": [
+   "estado",
+   "estatal",
+   "gubernamental",
+   "publico"
+  ],
+  "publico": [
+   "entidad publica",
+   "estado",
+   "estatal",
+   "gubernamental"
+  ],
+  "pyme": [
+   "mediano",
+   "pequeno"
+  ],
+  "recomendacion": [
+   "proponer",
+   "propuesta",
+   "recomendar"
+  ],
+  "red": [
+   "conectividad",
+   "telecomunicacion"
+  ],
+  "report": [
+   "informe",
+   "reporte"
+  ],
+  "resort": [
+   "alojamiento",
+   "hotel",
+   "hotelero"
+  ],
+  "rural": [
+   "campo",
+   "territorial",
+   "territorio"
+  ],
+  "secretaria": [
+   "estado",
+   "estatal",
+   "gobierno",
+   "publica",
+   "publico",
+   "territorial"
+  ],
+  "sin_animo_de_lucro": [
+   "comunitario",
+   "solidario"
+  ],
+  "software": [
+   "aplicacion",
+   "desarrollo",
+   "programa",
+   "programacion"
+  ],
+  "startup": [
+   "emprender",
+   "emprendimiento",
+   "negocio"
+  ],
+  "startups": [
+   "emprender",
+   "emprendimiento",
+   "startup"
+  ],
+  "starups": [
+   "emprender",
+   "emprendimiento",
+   "negocio",
+   "startup"
+  ],
+  "superintendencia": [
+   "estado",
+   "estatal",
+   "gobierno",
+   "publica",
+   "publico",
+   "territorial"
+  ],
+  "supervisar": [
+   "control",
+   "controlar",
+   "seguimiento",
+   "supervision"
+  ],
+  "supervisor": [
+   "control",
+   "seguimiento",
+   "supervisar",
+   "supervision"
+  ],
+  "tablero": [
+   "dashboard",
+   "indicador",
+   "visualizacion"
+  ],
+  "tecnologia": [
+   "stem"
+  ],
+  "turismo": [
+   "turista",
+   "turistico"
+  ],
+  "tutoria": [
+   "acompanamiento",
+   "acompanar",
+   "orientar"
+  ],
+  "venta": [
+   "comercial",
+   "vender"
+  ]
+ },
+ "AGENTE_IRREGULAR": {
+  "analista": [
+   "analizar",
+   "analisis"
+  ],
+  "asesor": [
+   "asesorar",
+   "asesoria"
+  ],
+  "auditor": [
+   "auditar",
+   "auditoria"
+  ],
+  "consultor": [
+   "consultoria",
+   "asesorar",
+   "asesoria",
+   "consultar"
+  ],
+  "contratista": [
+   "contratar",
+   "contratacion"
+  ],
+  "director": [
+   "dirigir",
+   "direccion"
+  ],
+  "disenador": [
+   "disenar",
+   "diseno"
+  ],
+  "docente": [
+   "docencia",
+   "ensenar",
+   "ensenanza"
+  ],
+  "emprendedor": [
+   "emprender",
+   "emprendimiento"
+  ],
+  "gerente": [
+   "gerencia",
+   "gerenciar"
+  ],
+  "investigador": [
+   "investigar",
+   "investigacion"
+  ],
+  "lider": [
+   "liderar",
+   "liderazgo"
+  ],
+  "pedagogo": [
+   "pedagogia",
+   "pedagogico"
+  ],
+  "periodista": [
+   "periodismo",
+   "periodistico"
+  ],
+  "tutor": [
+   "tutoria",
+   "acompanar",
+   "acompanamiento"
+  ]
+ },
+ "VALIDACION": {
+  "referencia": "Lectura de 11 matrices de ocho enfoques disciplinares, elaborada con asistencia de IAg (pendiente de validación por el comité curricular)",
+  "decisiones": 1287,
+  "acuerdo": 0.801,
+  "kappa": 0.441,
+  "acuerdo_por_enfoque_excluido": [
+   0.689,
+   0.842
+  ],
+  "fecha": "2026-10-04"
+ }
+}
