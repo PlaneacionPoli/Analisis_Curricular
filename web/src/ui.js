@@ -18,7 +18,10 @@ export function h(tag, attrs = {}, ...hijos) {
     if (k === 'html') e.innerHTML = v;
     else if (k.startsWith('on')) e.addEventListener(k.slice(2), v);
     else if (k === 'class') e.className = v;
-    else if (k === 'style' && typeof v === 'object') Object.assign(e.style, v);
+    else if (k === 'style' && typeof v === 'object') {
+      // las variables CSS (--n) solo se aplican con setProperty; Object.assign las ignora
+      for (const [p, x] of Object.entries(v)) (p.startsWith('--') ? e.style.setProperty(p, x) : (e.style[p] = x));
+    }
     else e.setAttribute(k, v === true ? '' : v);
   }
   for (const c of hijos.flat()) {
@@ -48,6 +51,37 @@ export function metrica(etiqueta, valor, ayuda) {
     h('div', { class: 'metrica-valor' }, valor));
 }
 
+/** Indicador destacado: icono, cifra grande, etiqueta y una nota de contexto. */
+export function kpi({ icono: ic, etiqueta, valor, nota = '', color = '#1fb2de', ayuda = '' }) {
+  return h('div', { class: 'kpi', title: ayuda, style: { '--c': color } },
+    h('div', { class: 'kpi-icono' }, icono(ic)),
+    h('div', { class: 'kpi-cuerpo' },
+      h('div', { class: 'kpi-etiqueta' }, etiqueta),
+      h('div', { class: 'kpi-valor' }, valor),
+      nota ? h('div', { class: 'kpi-nota' }, nota) : null));
+}
+
+/** Panel con título, bajada y contenido (agrupa un gráfico o tabla con su lectura). */
+export function panel({ titulo: t, bajada = '', lectura = '' }, ...contenido) {
+  return h('section', { class: 'panel' },
+    h('header', {}, h('h3', {}, t), bajada ? h('p', { class: 'leyenda' }, bajada) : null),
+    ...contenido,
+    lectura ? h('p', { class: 'lectura', html: `<i class="bi bi-lightbulb"></i> ${lectura}` }) : null);
+}
+
+/** Barra horizontal segmentada (composición 100 %) con leyenda. partes: [{etiqueta, valor, color}] */
+export function barraSegmentada(partes, { formato = v => v } = {}) {
+  const total = partes.reduce((s, p) => s + p.valor, 0) || 1;
+  return h('div', { class: 'segmentada' },
+    h('div', { class: 'seg-barra' }, ...partes.filter(p => p.valor > 0).map(p =>
+      h('span', { style: { width: `${100 * p.valor / total}%`, background: p.color }, title: `${p.etiqueta}: ${formato(p.valor)} (${(100 * p.valor / total).toFixed(0)} %)` }))),
+    h('ul', { class: 'seg-leyenda' }, ...partes.map(p =>
+      h('li', {}, h('i', { style: { background: p.color } }), h('b', {}, formato(p.valor)), ` ${p.etiqueta}`, h('small', {}, ` ${(100 * p.valor / total).toFixed(0)} %`)))));
+}
+
+/** Etiqueta breve (dato de contexto). */
+export const chip = (texto, ic = null) => h('span', { class: 'chip' }, ic ? icono(ic) : null, texto);
+
 export function columnas(...hijos) {
   return h('div', { class: 'columnas', style: { '--n': hijos.length } }, ...hijos);
 }
@@ -59,9 +93,16 @@ export function grafico(trazas, layout = {}, config = {}) {
     font: { family: 'Inter, "Segoe UI", system-ui, sans-serif', color: '#0F385A', size: 12 },
     paper_bgcolor: 'rgba(0,0,0,0)', plot_bgcolor: 'rgba(0,0,0,0)',
     margin: { l: 50, r: 20, t: 30, b: 50 }, autosize: true,
+    colorway: ['#1FB2DE', '#0F385A', '#FBAF17', '#EC0677', '#42F2F2', '#8A94A0'],
+    hoverlabel: { bgcolor: '#0F385A', font: { color: '#fff', size: 12 }, bordercolor: '#0F385A' },
+    xaxis: { gridcolor: '#EEF3F8', zerolinecolor: '#DBE7F0', linecolor: '#DBE7F0' },
+    yaxis: { gridcolor: '#EEF3F8', zerolinecolor: '#DBE7F0', linecolor: '#DBE7F0' },
   };
-  queueMicrotask(() => Plotly.newPlot(cont, trazas, { ...base, ...layout },
-    { responsive: true, displaylogo: false, ...config }));
+  // los ejes que pasa cada gráfico se combinan con el estilo base (no lo reemplazan)
+  const unir = (a, b) => ({ ...a, ...b });
+  const final = { ...base, ...layout, xaxis: unir(base.xaxis, layout.xaxis), yaxis: unir(base.yaxis, layout.yaxis) };
+  queueMicrotask(() => Plotly.newPlot(cont, trazas, final,
+    { responsive: true, displaylogo: false, displayModeBar: 'hover', modeBarButtonsToRemove: ['lasso2d', 'select2d'], ...config }));
   return cont;
 }
 
@@ -69,7 +110,8 @@ export function grafico(trazas, layout = {}, config = {}) {
 export function tabla(datos, columnasDef, opciones = {}) {
   const cont = h('div', { class: 'tabla' });
   queueMicrotask(() => new Tabulator(cont, {
-    data: datos, columns: columnasDef, layout: 'fitDataStretch', placeholder: 'Sin registros', ...opciones,
+    // sin rutas anidadas: varias columnas llevan punto en el nombre («Cr. Total», «B.Institucional») y Tabulator las leería como objetos
+    data: datos, columns: columnasDef, layout: 'fitDataStretch', placeholder: 'Sin registros', nestedFieldSeparator: false, ...opciones,
   }));
   return cont;
 }

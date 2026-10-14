@@ -140,7 +140,12 @@ function contenido() {
   bloques.push(filtrosGlobales());
   const filas = filasFiltradas();
   const p = PAGINAS.find(x => x[0] === pagina);
-  if (pagina === 'Inicio') bloques.push(paginaInicio(filas));
+  if (pagina === 'Inicio') {
+    const ids = new Set(filas.map(f => f.Matriz));
+    const m = obtener().matriz;
+    bloques.push(paginaInicio(filas, { todasFilas: datos.filas, seleccion: m && ids.has(m) ? m : null,
+      etiqueta: new Map(listaMatrices().map(x => [x.id, x.etiqueta])) }));
+  }
   else if (pagina === 'Explorar Datos') bloques.push(paginaDatos(filas, render));
   else if (pagina === 'Perfil de Egreso (V1)') {
     const todas = listaMatrices();
