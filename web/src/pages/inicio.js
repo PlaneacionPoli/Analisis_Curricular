@@ -17,6 +17,14 @@ const COLUMNAS_RESUMEN = ['Programa', 'Modalidad', 'Sede', 'Nivel', 'Asignaturas
 const TEXTO = ['Programa', 'Modalidad', 'Sede', 'Nivel'];
 const COL_ASIG = 'Nombre asignatura o modulo';
 const miles = n => n.toLocaleString('es-CO');
+const normRA = t => String(t ?? '').normalize('NFKD').replace(/[\u0080-\uffff]/g, '').toLowerCase().replace(/[^a-z0-9 ]/g, ' ').replace(/\s+/g, ' ').trim();
+
+/** Resultados de aprendizaje únicos: un RA cuenta una vez por matriz aunque se repita en varias asignaturas (D4). */
+function raUnicos(filas) {
+  const s = new Set();
+  for (const f of filas) { const t = f['Resultado de aprendizaje']; if (t != null && String(t).trim() !== '') s.add(`${f.Matriz}|${normRA(t)}`); }
+  return s.size;
+}
 
 /** Matrices (programa-sede) distintas presentes en las filas. */
 function unidades(filas) {
@@ -127,12 +135,12 @@ function vistaConjunto(filas, datos) {
   return h('div', { class: 'inicio' },
     hero({ etiqueta: 'Resumen del conjunto', titulo: 'Análisis microcurricular',
       lead: 'Panorama de las matrices cargadas: qué se analizó y cómo se compone. Desde el menú puedes profundizar en cobertura temática, tendencias, taxonomías, indicadores y el perfil de egreso.',
-      chips: [chip(`${programas.length} matrices`, 'collection'), chip(`${new Set(filas.map(f => f.Programa)).size} programas`, 'mortarboard'), chip(`${miles(asignaturas)} asignaturas`, 'journal-text'), chip(`${miles(filas.length)} registros`, 'table')] }),
+      chips: [chip(`${programas.length} matrices`, 'collection'), chip(`${new Set(filas.map(f => f.Programa)).size} programas`, 'mortarboard'), chip(`${miles(asignaturas)} asignaturas`, 'journal-text'), chip(`${miles(raUnicos(filas))} RA únicos`, 'bullseye')] }),
     columnas(
       kpi({ icono: 'mortarboard', etiqueta: 'Programas', valor: new Set(filas.map(f => f.Programa)).size, nota: 'distintos por nombre', color: '#0F385A', ayuda: 'Un programa ofrecido en varias sedes cuenta una vez.' }),
       kpi({ icono: 'collection', etiqueta: 'Matrices', valor: programas.length, nota: 'programa · modalidad · sede', color: '#1FB2DE', ayuda: 'Unidad de análisis: cada combinación Programa + Modalidad + Sede tiene su propia matriz.' }),
       kpi({ icono: 'journal-text', etiqueta: 'Asignaturas', valor: miles(asignaturas), nota: 'nombres únicos', color: '#FBAF17' }),
-      kpi({ icono: 'table', etiqueta: 'Registros', valor: miles(filas.length), nota: 'filas del Paso 5', color: '#EC0677', ayuda: 'Una fila por resultado de aprendizaje y asignatura.' })),
+      kpi({ icono: 'bullseye', etiqueta: 'Resultados de aprendizaje', valor: miles(raUnicos(filas)), nota: 'RA únicos por matriz', color: '#EC0677', ayuda: `Un RA cuenta una vez por matriz aunque se repita en varias asignaturas. El Paso 5 trae ${miles(filas.length)} filas (RA × asignatura).` })),
     columnas(
       panel({ titulo: 'Modalidad', bajada: 'Matrices por modalidad' },
         barraSegmentada(mods.map(m => ({ etiqueta: m, valor: nMod(m), color: COLOR_MOD[m] ?? '#8A94A0' })))),
@@ -164,7 +172,7 @@ function vistaMatriz(filas, todasFilas, seleccion, etiqueta, datos) {
     gemelas.length ? aviso('warning', `Misma matriz en otras sedes: ${gemelas.map(g => etiqueta.get(g.Matriz) ?? g.Matriz).join('; ')}. Comparten RA y núcleos casi idénticos: no se comparan como hallazgo.`) : null,
     columnas(
       kpi({ icono: 'journal-text', etiqueta: 'Asignaturas', valor: asignaturas, nota: 'nombres únicos', color: '#FBAF17' }),
-      kpi({ icono: 'table', etiqueta: 'Registros', valor: miles(mias.length), nota: 'filas del Paso 5', color: '#EC0677' }),
+      kpi({ icono: 'bullseye', etiqueta: 'Resultados de aprendizaje', valor: raUnicos(mias), nota: 'RA únicos de la matriz', color: '#EC0677', ayuda: `El Paso 5 trae ${miles(mias.length)} filas (RA × asignatura).` }),
       kpi({ icono: 'calendar3', etiqueta: 'Semestres', valor: semestres || '—', nota: 'con asignaturas', color: '#1FB2DE' }),
       kpi({ icono: 'award', etiqueta: 'Créditos oficiales', valor: credito ?? 'sin dato', nota: credito ? 'total del programa' : 'el Excel no trae totales', color: '#0F385A' })),
     columnas(
