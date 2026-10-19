@@ -51,7 +51,7 @@ export async function calcularFaltantes(archivoDe, modo, rerender) {
     const pendientes = [];
     for (const [id, archivo] of archivoDe) if (archivo && !(await perfilEnCache(archivo))) pendientes.push([id, archivo]);
     estado.total = pendientes.length;
-    if (!pendientes.length) { estado.corriendo = false; estado.fase = ''; estado.version++; rerender(); return; }   // todo en caché: no hace falta iniciar el motor ni el modelo
+    if (!pendientes.length) { estado.corriendo = false; estado.fase = ''; rerender(); return; }   // todo en caché: no hace falta iniciar el motor ni el modelo
     estado.fase = 'modelo';
     rerender();
     const st = estadoPerfil();

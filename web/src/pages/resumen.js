@@ -5,7 +5,7 @@ import { MIME_XLSX } from '../export/excelMarca.js';
 import { CRITERIOS_EVALUADOS as CRITERIOS } from '../data/indicadores.js';
 import { cargarConfig, hayConfig } from '../data/tendencias.js';
 import { porGrupo } from '../data/taxonomias.js';
-import { aviso, botonDescarga, columnas, descargar, grafico, h, info, kpi, panel, selector, tabla, titulo } from '../ui.js';
+import { aviso, botonDescarga, columnas, descargar, grafico, h, info, kpi, metrica, panel, selector, tabla, titulo } from '../ui.js';
 import { actualizar } from '../store.js';
 import { cargarLogo, contextoInformes, nombreArchivoPdf, pdfGeneral, pdfPrograma, programasDe, zipInformes } from '../export/informesDatos.js';
 import { datosIndicadores, paginaIndicadores } from './indicadores.js';
@@ -16,7 +16,7 @@ import { panelV1 } from './panelV1.js';
 
 const ICONO = { Cumple: '🟢 Cumple', Parcial: '🟡 Parcial', 'No cumple': '🔴 No cumple', 'Sin dato': '⚪ Sin dato' };
 const COLOR = { Cumple: '#1FB2DE', Parcial: '#FBAF17', 'No cumple': '#EC0677', 'Sin dato': '#8A94A0' };
-const local = { pestana: 'Estado del conjunto', tipoCompetencia: 'Todas', rerender: null, matriz: null, cfgCargando: false, autoV1: false, exig: null, exigFirma: '', exigCargando: false, programa: null, pdf: { ocupado: false, mensaje: '' } };
+const local = { pestana: 'Estado del conjunto', tipoCompetencia: 'Todas', rerender: null, matriz: null, cfgCargando: false, autoV1: false, autoVersion: -1, exig: null, exigFirma: '', exigCargando: false, programa: null, pdf: { ocupado: false, mensaje: '' } };
 const fmt = v => (v === null || v === undefined ? '—' : `${v.toFixed(0)}%`);
 const miles = n => n.toLocaleString('es-CO');
 const PESTANAS = ['Estado del conjunto', 'Listados de revisión', 'Acciones e informes', 'Detalle por indicador'];
@@ -90,8 +90,9 @@ export function paginaResumen({ filas, todasFilas, archivos, archivoDe, etiqueta
   // al entrar al Resumen, V1 se completa solo si ya se eligió el modo (con o sin modelo); la primera vez se pide la elección
   const lote = estadoLote();
   // solo cuando ya se leyó la caché: antes «faltan» todas las matrices y se arrancaría el motor sin necesidad
-  if (d.v1Leido && d.faltanPerfil > 0 && modoPerfil() && !lote.corriendo && !lote.error && !lote.omitido && !local.autoV1) {
-    local.autoV1 = true;
+  // un intento por estado del lote: si tras calcular siguen «faltando» matrices (p. ej. con error), no se relanza en bucle
+  if (d.v1Leido && d.faltanPerfil > 0 && modoPerfil() && !lote.corriendo && !lote.error && !lote.omitido && !local.autoV1 && local.autoVersion !== lote.version) {
+    local.autoV1 = true; local.autoVersion = lote.version;
     queueMicrotask(() => calcularFaltantes(archivoDe, modoPerfil(), rerender).finally(() => { local.autoV1 = false; }));
   }
 

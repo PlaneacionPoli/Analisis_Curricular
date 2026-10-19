@@ -11,7 +11,7 @@ import { libroIndicadores } from '../export/libros.js';
 import { MIME_XLSX } from '../export/excelMarca.js';
 import { aviso, botonDescarga, columnas, descargar, grafico, h, info, metrica, selector, tabla, titulo } from '../ui.js';
 
-const local = { firma: '', res: null, cargando: false, avance: null, error: null, v1: {}, perfil: {}, enCache: new Set(), versionLote: 0, v1Firma: '', matrizVal: null, leyendo: false, v1Leido: false };
+const local = { firma: '', res: null, cargando: false, avance: null, error: null, v1: {}, perfil: {}, enCache: new Set(), versionLote: 0, v1Firma: '', matrizVal: null, leyendo: false, v1Leido: false, ultimaLectura: 0 };
 const COLOR_ESTADO = { Cumple: '#1FB2DE', Parcial: '#FBAF17', 'No cumple': '#EC0677', 'Sin dato': '#8A94A0' };
 const fmt = v => (v === null || v === undefined ? '—' : `${v.toFixed(0)}%`);
 
@@ -37,7 +37,7 @@ async function leerV1(archivoDe, rerender) {
     perfil[id] = { sin: ind['% Sin asociación'], tres: ind['% Tres capas'], nSin: ind.n_sin, n: ind.Atributos };
   }
   const cambio = JSON.stringify(v1) !== JSON.stringify(local.v1) || enCache.size !== local.enCache.size;
-  local.v1 = v1; local.perfil = perfil; local.enCache = enCache; local.leyendo = false; local.v1Leido = true;
+  local.v1 = v1; local.perfil = perfil; local.enCache = enCache; local.leyendo = false; local.v1Leido = true; local.ultimaLectura = performance.now();
   if (cambio) rerender();
 }
 
@@ -53,14 +53,16 @@ export function datosIndicadores({ archivos, archivoDe, rerender }) {
     return local.error ? { error: local.error } : { avance: local.avance };
   }
   asegurarV1(archivoDe, rerender);
-  return { matrices: local.res.matrices, errores: local.res.errores, v1: local.v1, perfil: local.perfil, v1Leido: local.v1Leido,
+  return { matrices: local.res.matrices, errores: local.res.errores, v1: local.v1, perfil: local.perfil, v1Leido: local.v1Leido && !local.leyendo && local.versionLote === estadoLote().version,
     faltanPerfil: [...archivoDe].filter(([id, a]) => a && !local.enCache.has(id)).length };
 }
 
 
 function asegurarV1(archivoDe, rerender) {
   const lote = estadoLote();
-  if (!local.leyendo && !lote.corriendo && (local.enCache.size < archivoDe.size || local.versionLote !== lote.version)) {
+  // se relee la caché al entrar, cuando termina un cálculo y, si aún faltan matrices, como máximo cada 30 s (leer 50 resultados es lento y repintar en cada vuelta congelaría la página)
+  const tocaLeer = !local.v1Leido || local.versionLote !== lote.version || (local.enCache.size < archivoDe.size && performance.now() - local.ultimaLectura > 30000);
+  if (!local.leyendo && !lote.corriendo && tocaLeer) {
     local.leyendo = true; local.versionLote = lote.version; leerV1(archivoDe, rerender);
   }
 }
