@@ -152,11 +152,15 @@ function niveles(ra, etiqueta, rerender, filasDf) {
       x: progs.map(p => { const g = ra.filter(r => r.Programa === p); return 100 * g.filter(r => r['Dominio declarado'] === d).length / g.length; }),
       hovertemplate: '%{y}<br>' + d + ': %{x:.0f} %<extra></extra>' })),
     { height: Math.max(320, 24 * progs.length + 120), barmode: 'stack', xaxis: { range: [0, 100], ticksuffix: ' %' }, yaxis: { automargin: true, tickfont: { size: 10.5 } }, margin: { l: 10, r: 10, t: 10, b: 40 }, legend: { orientation: 'h', y: 1.04 } }),
-    progresion(ra, filasDf));
+    progresion(ra, filasDf, { tax, clasif, claveDe }));
 }
 
-function progresion(ra, filasDf) {
-  const clavePorMatriz = new Map(ra.map(r => [`${r.Matriz}|${r.clave}`, r]));
+/**
+ * ¿Qué niveles se trabajan en cada semestre? Por semestre, % de los RA (de la taxonomía elegida) que declara cada nivel; un RA cuenta una vez por matriz y semestre.
+ * Usa la misma clasificación que la gráfica por matriz, sin resumirla en un índice.
+ */
+function progresion(ra, filasDf, { tax, clasif, claveDe }) {
+  const clavePorMatriz = new Map(ra.filter(r => r['Taxonomía'] === tax).map(r => [`${r.Matriz}|${r.clave}`, r]));
   const vistos = new Set(), sem = [];
   for (const f of filasDf) {
     const s = Number(f.Semestre);
@@ -166,15 +170,22 @@ function progresion(ra, filasDf) {
     if (vistos.has(key)) continue;
     vistos.add(key);
     const r = clavePorMatriz.get(`${f.Matriz}|${c}`);
-    if (r) sem.push({ s, ex: r['Exigencia declarada'] });
+    if (r) sem.push({ s, k: claveDe(r) });
   }
   if (!sem.length) return null;
   const semestres = [...new Set(sem.map(x => x.s))].sort((a, b) => a - b);
-  return h('div', {}, h('hr'), h('h3', {}, '¿Crece la exigencia a lo largo del plan de estudios?'),
-    h('p', { class: 'leyenda' }, 'Índice de exigencia de los RA según el semestre en que se trabajan las asignaturas (Paso 5). En general se espera que suba en los semestres avanzados.'),
-    grafico([{ type: 'scatter', mode: 'lines+markers', x: semestres, y: semestres.map(s => indiceExigencia(sem.filter(x => x.s === s).map(x => x.ex))), line: { color: '#0F385A', width: 3 }, marker: { color: '#1FB2DE', size: 9 },
-      hovertemplate: 'Semestre %{x}: %{y}<extra></extra>' }],
-    { height: 300, yaxis: { range: [0, 100], title: 'Índice de exigencia' }, xaxis: { title: 'Semestre', dtick: 1 }, margin: { l: 50, r: 10, t: 10, b: 40 } }));
+  const n = Object.fromEntries(semestres.map(s => [s, sem.filter(x => x.s === s).length]));
+  const otra = sem.filter(x => !clasif.some(c => c.id === x.k));
+  const cats = [...clasif, ...(otra.length ? [{ id: '', etq: 'Otra combinación', color: '#8A94A0' }] : [])];
+  const cuenta = (c, s) => sem.filter(x => x.s === s && (c.id === '' ? !clasif.some(k => k.id === x.k) : x.k === c.id)).length;
+  return h('div', {}, h('hr'), h('h3', {}, '¿Qué niveles se trabajan en cada semestre?'),
+    h('p', { class: 'leyenda' }, `Para cada semestre, qué porcentaje de los RA que se trabajan en sus asignaturas (Paso 5) declara cada nivel de la taxonomía ${tax}, elegida arriba. ` +
+      'Un RA cuenta una vez por matriz y semestre. Debajo de cada semestre aparece cuántos RA se contaron; con pocos RA los porcentajes varían mucho.'),
+    grafico(cats.map(c => ({ type: 'bar', name: c.etq, x: semestres, y: semestres.map(s => Math.round(1000 * cuenta(c, s) / n[s]) / 10), marker: { color: c.color },
+      text: semestres.map(s => (cuenta(c, s) / n[s] >= 0.08 ? `${Math.round(100 * cuenta(c, s) / n[s])} %` : '')), textposition: 'inside', insidetextanchor: 'middle', textfont: { size: 10 },
+      customdata: semestres.map(s => [cuenta(c, s), n[s]]), hovertemplate: `Semestre %{x}<br>${c.etq}: %{y} % (%{customdata[0]} de %{customdata[1]} RA)<extra></extra>` })),
+    { height: 380, barmode: 'stack', xaxis: { title: 'Semestre', tickmode: 'array', tickvals: semestres, ticktext: semestres.map(s => `${s}<br>(${n[s]} RA)`) }, yaxis: { range: [0, 100], ticksuffix: ' %', title: '% de los RA del semestre' },
+      margin: { l: 60, r: 10, t: 10, b: 70 }, legend: { orientation: 'h', y: -0.28, font: { size: 10.5 } }, plot_bgcolor: 'white' }));
 }
 
 function revision(ra, res, etiqueta, rerender) {
