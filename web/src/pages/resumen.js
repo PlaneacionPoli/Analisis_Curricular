@@ -89,7 +89,8 @@ export function paginaResumen({ filas, todasFilas, archivos, archivoDe, etiqueta
 
   // al entrar al Resumen, V1 se completa solo si ya se eligió el modo (con o sin modelo); la primera vez se pide la elección
   const lote = estadoLote();
-  if (d.faltanPerfil > 0 && modoPerfil() && !lote.corriendo && !lote.error && !local.autoV1) {
+  // solo cuando ya se leyó la caché: antes «faltan» todas las matrices y se arrancaría el motor sin necesidad
+  if (d.v1Leido && d.faltanPerfil > 0 && modoPerfil() && !lote.corriendo && !lote.error && !lote.omitido && !local.autoV1) {
     local.autoV1 = true;
     queueMicrotask(() => calcularFaltantes(archivoDe, modoPerfil(), rerender).finally(() => { local.autoV1 = false; }));
   }

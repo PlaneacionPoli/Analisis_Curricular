@@ -3,9 +3,17 @@
 import { calcularPerfil, estadoPerfil, iniciar, perfilEnCache, prepararConfig, reiniciar } from './servicio.js';
 
 const CLAVE_MODO = 'perfil_modo';
-const estado = { corriendo: false, hechas: 0, total: 0, nombre: '', modelo: null, error: null, version: 0 };
+// fase: 'cache' (revisando qué matrices ya están calculadas), 'modelo' (iniciando el cálculo) o 'calculando'; omitido: la persona pidió ver el resumen sin esperar
+const estado = { corriendo: false, hechas: 0, total: 0, nombre: '', modelo: null, error: null, version: 0, fase: '', inicio: 0, cancelar: false, omitido: false };
 
 export const estadoLote = () => estado;
+
+/** Detiene el cálculo después de la matriz en curso; lo ya calculado queda en la caché y V1 sigue incompleta. */
+export function omitirCalculo(rerender) {
+  if (!estado.corriendo) return;
+  estado.cancelar = true;
+  rerender?.();
+}
 
 export function modoPerfil() {
   try { return localStorage.getItem(CLAVE_MODO); } catch { return null; }
@@ -36,17 +44,22 @@ export async function conPerfilEnCache(archivoDe) {
 export async function calcularFaltantes(archivoDe, modo, rerender) {
   if (estado.corriendo) return;
   fijarModoPerfil(modo);
-  Object.assign(estado, { corriendo: true, hechas: 0, total: 0, nombre: '', error: null, modelo: null });
+  Object.assign(estado, { corriendo: true, hechas: 0, total: 0, nombre: '', error: null, modelo: null, fase: 'cache', inicio: 0, cancelar: false, omitido: false });
   rerender();
   try {
     await prepararConfig();
     const pendientes = [];
     for (const [id, archivo] of archivoDe) if (archivo && !(await perfilEnCache(archivo))) pendientes.push([id, archivo]);
     estado.total = pendientes.length;
+    if (!pendientes.length) { estado.corriendo = false; estado.fase = ''; estado.version++; rerender(); return; }   // todo en caché: no hace falta iniciar el motor ni el modelo
+    estado.fase = 'modelo';
+    rerender();
     const st = estadoPerfil();
     if (st.listo && st.semantica !== (modo === 'semantico')) reiniciar();
     await iniciar({ conSemantica: modo === 'semantico', alModelo: p => { estado.modelo = p; repintar(rerender); } });
+    estado.fase = 'calculando'; estado.inicio = performance.now();
     for (const [, archivo] of pendientes) {
+      if (estado.cancelar) { estado.omitido = true; break; }
       estado.nombre = archivo.nombre.replace(/^FormatoRA[_-]|\.xlsx?$/g, '');
       repintar(rerender);
       await calcularPerfil(archivo);
@@ -56,6 +69,7 @@ export async function calcularFaltantes(archivoDe, modo, rerender) {
     estado.error = String(e?.message ?? e);
   }
   estado.corriendo = false;
+  estado.fase = '';
   estado.version++;
   rerender();
 }
