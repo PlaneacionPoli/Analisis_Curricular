@@ -236,6 +236,16 @@ export function informeGeneral(d, logo = null) {
 
   if (d.lectura?.length) { pdf.seccion('Lectura rápida'); pdf.lista(d.lectura); }
 
+  if (d.principales?.filas?.length) {
+    const { filas: ft, n } = d.principales;
+    pdf.seccion('Principales tendencias globales');
+    pdf.parrafo(d.principales.lectura, 9);
+    pdf.parrafo('Asignaturas cuyo nombre o contenido menciona la tendencia (palabras clave); no es un juicio sobre su enfoque. Pregrado y posgrado se comparan por separado.', 8, GRIS);
+    pdf.tabla(['Tendencia', 'Conjunto', `Pregrado (${n.Pregrado.programas} prog.)`, `Posgrado (${n.Posgrado.programas} prog.)`, 'Programas con la tendencia'],
+      ft.map(t => [t.Tendencia, pct(t.Total.pct), pct(t.Pregrado.pct), pct(t.Posgrado.pct), `${t.Total.programas} de ${n.Total.programas}`]), [78, 22, 30, 30, 32],
+      { alinear: ['LEFT', 'CENTER', 'CENTER', 'CENTER', 'CENTER'] });
+  }
+
   const g = d.globales ?? {};
   if (g.matrices) {
     pdf.seccion('Coherencia y trazabilidad curricular (V1-V5)');
@@ -324,7 +334,7 @@ export function informePrograma(d, logo = null) {
 
   if (d.tipo_saber?.length) {
     pdf.seccion('Distribución del tipo de saber');
-    pdf.tabla(['Tipo de saber', 'Programa', 'Mediana del conjunto', 'Diferencia'],
+    pdf.tabla(['Tipo de saber', 'Programa', d.nivel_programa ? `Mediana de ${d.nivel_programa.toLowerCase()}` : 'Mediana (nivel no identificado)', 'Diferencia'],
       d.tipo_saber.map(t => [t.Tipo, pct(t.Programa), pct(t.Mediana), t.Programa === null || t.Mediana === null || t.Programa === undefined || t.Mediana === undefined ? '-'
         : `${t.Programa - t.Mediana >= 0 ? '+' : '-'}${coma(Math.abs(t.Programa - t.Mediana), 0)} pp`]), [60, 40, 40, 40], { alinear: ['LEFT', 'CENTER', 'CENTER', 'CENTER'] });
   }

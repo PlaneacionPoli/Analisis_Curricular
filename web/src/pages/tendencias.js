@@ -2,7 +2,7 @@
 import { aciertosPorFila, cargarConfig, configActual, guardarConfig as guardar, hayConfig, resumirTendencias, restaurarConfig as restaurar, validarImportacion } from '../data/tendencias.js';
 import { cmp } from '../data/util.js';
 import { libroListado } from '../export/excelListado.js';
-import { aviso, botonDescarga, columnas, descargar, grafico, h, info, metrica, selector, tabla, titulo } from '../ui.js';
+import { aviso, botonDescarga, columnas, descargar, envolver, grafico, h, info, metrica, selector, tabla, titulo } from '../ui.js';
 
 const local = { pestana: 'Vista global', tendencia: null, tendenciaMatriz: null, matriz: null, cargando: false };
 const corto = (t, n) => (t.length > n ? t.slice(0, n) + '…' : t);
@@ -35,22 +35,20 @@ function mapaCalor(porMatriz, T, etiqueta, ids) {
     xaxis: { side: 'top', tickangle: -35, tickfont: { size: 10 }, automargin: true }, yaxis: { autorange: 'reversed', tickfont: { size: 10.5 }, automargin: true } });
 }
 
-function barrasCobertura(res, T) {
-  const d = Object.keys(T).map(t => ({ n: corto(T[t].descripcion, 38), v: res.cobertura[t], c: res.conteo[t] })).sort((a, b) => a.v - b.v);
-  return grafico([{ type: 'bar', orientation: 'h', x: d.map(x => +x.v.toFixed(1)), y: d.map(x => x.n), text: d.map(x => `${x.v.toFixed(0)}%`), textposition: 'outside',
-    customdata: d.map(x => x.c), hovertemplate: '%{y}<br>%{x}%<br>%{customdata} asignatura(s)<extra></extra>',
-    marker: { color: d.map(x => x.v), cmin: 0, cmax: 100, colorscale: [[0, '#F8D7DA'], [0.3, '#FBAF17'], [0.6, '#8BC34A'], [1, '#2E7D32']] } }],
-  { height: Math.max(380, d.length * 32 + 80), margin: { l: 10, r: 60, t: 20, b: 20 }, xaxis: { range: [0, 115], ticksuffix: '%', gridcolor: '#F0F0F0' },
-    yaxis: { automargin: true, tickfont: { size: 10 } }, plot_bgcolor: 'white',
-    shapes: [{ type: 'line', x0: 50, x1: 50, yref: 'paper', y0: 0, y1: 1, line: { dash: 'dash', color: '#0F385A', width: 1.5 } }] });
-}
-
-function barrasConteo(res, T) {
-  const d = Object.keys(T).map(t => ({ n: corto(T[t].descripcion, 38), v: res.conteo[t] })).sort((a, b) => a.v - b.v);
-  return grafico([{ type: 'bar', orientation: 'h', x: d.map(x => x.v), y: d.map(x => x.n), text: d.map(x => x.v), textposition: 'outside',
-    marker: { color: d.map(x => x.v), colorscale: [[0, '#C8E6F5'], [0.5, '#1FB2DE'], [1, '#0F385A']] } }],
-  { height: Math.max(380, d.length * 32 + 80), margin: { l: 10, r: 50, t: 20, b: 20 }, xaxis: { gridcolor: '#F0F0F0', title: 'N.º de asignaturas únicas' },
-    yaxis: { automargin: true, tickfont: { size: 10 } }, plot_bgcolor: 'white' });
+/**
+ * Una sola gráfica: % de asignaturas únicas que abordan cada tendencia, con el número de asignaturas junto a la barra y los nombres completos
+ * (partidos en varias líneas). `ref`: mediana del conjunto por tendencia (solo en la vista de una matriz), como rombo.
+ */
+function barrasTendencias(res, T, ref = null) {
+  const d = Object.keys(T).map(t => ({ t, n: envolver(T[t].descripcion, 42), v: res.cobertura[t], c: res.conteo[t] })).sort((a, b) => a.v - b.v);
+  const trazas = [{ type: 'bar', orientation: 'h', name: 'Esta vista', x: d.map(x => +x.v.toFixed(1)), y: d.map(x => x.n), text: d.map(x => `${x.v.toFixed(0)} % · ${x.c} asignaturas`), textposition: 'outside', cliponaxis: false,
+    customdata: d.map(x => x.c), hovertemplate: '%{y}<br>%{x} % de las asignaturas (%{customdata})<extra></extra>',
+    marker: { color: d.map(x => x.v), cmin: 0, cmax: Math.max(10, ...d.map(x => x.v)), colorscale: [[0, '#C8E6F5'], [0.5, '#1FB2DE'], [1, '#0F385A']] } }];
+  if (ref) trazas.push({ type: 'scatter', mode: 'markers', name: 'Mediana de las matrices', x: d.map(x => +ref[x.t].toFixed(1)), y: d.map(x => x.n),
+    marker: { symbol: 'diamond', size: 11, color: '#FBAF17', line: { width: 1, color: '#0F385A' } }, hovertemplate: 'Mediana de las matrices: %{x} %<extra></extra>' });
+  return grafico(trazas, { height: Math.max(380, d.length * 46 + 70), margin: { l: 10, r: 150, t: 10, b: 50 }, showlegend: !!ref, legend: { orientation: 'h', y: -0.1 },
+    xaxis: { range: [0, Math.min(100, Math.max(10, ...d.map(x => x.v), ...(ref ? Object.values(ref) : [0])) * 1.3)], ticksuffix: ' %', gridcolor: '#F0F0F0', title: '% de asignaturas únicas que abordan la tendencia' },
+    yaxis: { automargin: true, tickfont: { size: 11 } }, plot_bgcolor: 'white' });
 }
 
 function detalleTendencia(res, T, etiqueta, tid, filasVista, filtroMatriz) {
@@ -113,13 +111,9 @@ export function paginaTendencias({ todas, filas, etiqueta, seleccion, rerender }
     seleccion ? null : h('p', { class: 'leyenda' }, 'Cada celda es el porcentaje de asignaturas de la matriz que abordan la tendencia (pasa el cursor para ver el número). Las tendencias están ordenadas de mayor a menor presencia en el conjunto; las celdas vacías indican que ninguna asignatura la aborda.'),
     seleccion ? null : mapaCalor(Object.fromEntries(ids.map(i => [i, resumirTendencias(vista.filter(f => f.Matriz === i), aciertos)])), T, etiqueta, ids),
     h('hr'),
-    columnas(
-      h('div', {}, h('h3', {}, 'Cobertura por tendencia (% de asignaturas)'),
-        h('p', { class: 'leyenda' }, 'Porcentaje de asignaturas únicas que abordan cada tendencia.' + (seleccion ? ` Mediana del conjunto: ${tids.map(t => `${corto(T[t].descripcion, 18)} ${refCob[t].toFixed(0)}%`).slice(0, 4).join(' · ')}…` : '')),
-        barrasCobertura(res, T)),
-      h('div', {}, h('h3', {}, 'N.º de asignaturas por tendencia'),
-        h('p', { class: 'leyenda' }, 'Número absoluto de asignaturas que mencionan cada tendencia.'),
-        barrasConteo(res, T))),
+    h('h3', {}, 'Cobertura por tendencia'),
+    h('p', { class: 'leyenda' }, 'Porcentaje de asignaturas únicas que abordan cada tendencia; junto a cada barra, cuántas asignaturas son.' + (seleccion ? ' El rombo dorado es la mediana de todas las matrices cargadas.' : '')),
+    barrasTendencias(res, T, seleccion ? refCob : null),
     res.ausentes.length ? h('div', {}, h('hr'), h('h3', {}, 'Brechas curriculares detectadas'),
       aviso('warning', 'Las siguientes tendencias <b>no fueron detectadas en ninguna asignatura</b>. Considere si deberían incorporarse:'),
       h('ul', {}, ...res.ausentes.map(t => h('li', {}, h('b', {}, T[t].descripcion))))) : null,
@@ -135,7 +129,7 @@ export function paginaTendencias({ todas, filas, etiqueta, seleccion, rerender }
   if (!ids.includes(local.matriz)) local.matriz = ids[0];
   const sel = seleccion ?? local.matriz;
   const resM = resumirTendencias(vista.filter(f => f.Matriz === sel), aciertos);
-  const dM = tids.map(t => ({ t, n: corto(T[t].descripcion, 40), v: resM.cobertura[t], c: resM.conteo[t] })).sort((a, b) => b.v - a.v);
+  const dM = tids.map(t => ({ t, n: envolver(T[t].descripcion, 42), v: resM.cobertura[t], c: resM.conteo[t] })).sort((a, b) => b.v - a.v);
   const porMatrizTab = h('div', {},
     h('h3', {}, 'Análisis de tendencias por matriz'),
     h('p', { class: 'leyenda' }, 'Cuántas asignaturas cubren cada tendencia y cuáles son. Se usa la misma regla de asignación en todas las vistas (ver «Configurar Tendencias»).'),
@@ -145,9 +139,9 @@ export function paginaTendencias({ todas, filas, etiqueta, seleccion, rerender }
     h('hr'),
     grafico([{ type: 'bar', orientation: 'h', x: [...dM].reverse().map(x => +x.v.toFixed(1)), y: [...dM].reverse().map(x => x.n),
       customdata: [...dM].reverse().map(x => x.c), hovertemplate: '%{y}<br>%{x}%<br>%{customdata} asignatura(s)<extra></extra>',
-      marker: { color: [...dM].reverse().map(x => x.v), cmin: 0, cmax: 100, colorscale: [[0, '#EC0677'], [0.3, '#42F2F2'], [0.6, '#1FB2DE'], [1, '#0F385A']] } }],
-    { height: 480, title: { text: `Cobertura de tendencias en ${etiqueta.get(sel)}` }, xaxis: { title: '% de asignaturas' }, yaxis: { automargin: true },
-      shapes: [{ type: 'line', x0: 50, x1: 50, yref: 'paper', y0: 0, y1: 1, line: { dash: 'dot', color: '#FBAF17' } }], margin: { l: 10, r: 20, t: 40, b: 50 } }),
+      marker: { color: [...dM].reverse().map(x => x.v), cmin: 0, cmax: 100, colorscale: [[0, '#C8E6F5'], [0.5, '#1FB2DE'], [1, '#0F385A']] },
+      text: [...dM].reverse().map(x => `${x.v.toFixed(0)} % · ${x.c} asignaturas`), textposition: 'outside', cliponaxis: false }],
+    { height: Math.max(480, dM.length * 46 + 90), title: { text: `Cobertura de tendencias en ${etiqueta.get(sel)}` }, xaxis: { title: '% de asignaturas', range: [0, Math.min(100, Math.max(10, ...dM.map(x => x.v)) * 1.3)] }, yaxis: { automargin: true }, margin: { l: 10, r: 150, t: 40, b: 50 } }),
     h('hr'),
     selector('Seleccionar tendencia:', tids.map(t => T[t].descripcion), T[local.tendenciaMatriz ?? tids[0]]?.descripcion ?? T[tids[0]].descripcion,
       v => { local.tendenciaMatriz = tids.find(t => T[t].descripcion === v); rerender(); }),

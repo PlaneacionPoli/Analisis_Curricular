@@ -45,7 +45,7 @@ export async function contextoInformes({ filas, todasFilas, d, etiqueta, archivo
     const r = await perfilEnCache(archivo);
     if (r) items.set(id, r.items);
   }
-  return { filas, d, etiqueta, R, taxo, items, alcance: descripcionFiltros, vis };
+  return { filas, todasFilas, d, etiqueta, R, taxo, items, alcance: descripcionFiltros, vis };
 }
 
 /** Informe general: kpis, V1–V5, prioridades, taxonomías, hallazgos, tendencias y perfil por programa. */
@@ -69,7 +69,7 @@ export function datosGeneral(ctx) {
     alcance: ctx.alcance, kpis: R.kpis.map(([k, v]) => [k, miles(v)]), globales: R.g, criterios: CRITERIOS,
     conteo_criterios: R.conteo.map(([etq, , c]) => [etq, c]), lectura: R.lectura.map(sinHtml), prioridades,
     taxonomias: taxo.length ? { resumen: resumenContraste(taxo), por_programa: porGrupo(taxo, 'Programa') } : null,
-    alertas: R.al, tendencias: R.tend ?? [], programas, errores: [...d.errores, ...sinV1], etiqueta,
+    alertas: R.al, tendencias: R.tend ?? [], principales: R.principales ? { lectura: sinHtml(R.principales.lectura), filas: R.principales.filas.slice(0, 8), n: R.principales.n } : null, programas, errores: [...d.errores, ...sinV1], etiqueta,
   };
 }
 
@@ -101,9 +101,10 @@ export function datosPrograma(ctx, programa) {
   const sinNuc = [...asignaturasSinNucleos(fp)].sort();
   if (sinNuc.length) alertas.push(`${sinNuc.length} asignatura(s) no electivas sin núcleos temáticos: ${sinNuc.join(', ')}.`);
 
-  const { ts, medianas } = tipoSaberPorPrograma(filas);
-  const t = ts.get(programa);
-  const tipoSaber = ['Saber', 'SaberHacer', 'SaberSer'].map(k => ({ Tipo: k, Programa: t ? t[k] : null, Mediana: medianas[k] }));
+  // la mediana se calcula sobre todo lo cargado y solo entre programas del mismo nivel (pregrado o posgrado)
+  const { ts, medianas, nivel } = tipoSaberPorPrograma(ctx.todasFilas ?? filas);
+  const t = ts.get(programa), nivelPrograma = nivel.get(programa) ?? null;
+  const tipoSaber = ['Saber', 'SaberHacer', 'SaberSer'].map(k => ({ Tipo: k, Programa: t ? t[k] : null, Mediana: nivelPrograma ? medianas[nivelPrograma][k] : null }));
   let presentes = [], ausentes = [];
   if (R.presencia) {
     const T = configActual().TENDENCIAS_GLOBALES, p = R.presencia.get(programa) ?? new Set();
@@ -136,7 +137,7 @@ export function datosPrograma(ctx, programa) {
     taxonomias = { matrices: mats, revisar };
   }
   return { programa, alcance: `Sedes: ${unicos(fp, 'Sede').join(', ')}  |  Nivel: ${unicos(fp, 'Nivel').join(', ')}  |  Modalidad: ${unicos(fp, 'Modalidad').join(', ')}`,
-    kpis: kpis.map(([k, v]) => [k, String(v)]), matrices: detalle, tipo_saber: tipoSaber, tendencias_presentes: R.presencia ? presentes : null, tendencias_ausentes: ausentes,
+    kpis: kpis.map(([k, v]) => [k, String(v)]), matrices: detalle, tipo_saber: tipoSaber, nivel_programa: nivelPrograma, tendencias_presentes: R.presencia ? presentes : null, tendencias_ausentes: ausentes,
     alertas, taxonomias, criterios: CRITERIOS };
 }
 

@@ -2,7 +2,7 @@
 // Unidad de análisis: la matriz. La referencia (mediana de las matrices) se calcula siempre sobre todo lo cargado.
 import { claveNucleo, nucleosValidos, tokenizarCelda } from '../data/nucleos.js';
 import { cmp } from '../data/util.js';
-import { aviso, botonDescarga, columnas, descargar, aCsv, grafico, h, info, metrica, multiselect, selector, tabla, titulo } from '../ui.js';
+import { aviso, botonDescarga, columnas, descargar, aCsv, envolver, grafico, h, info, metrica, multiselect, selector, tabla, titulo } from '../ui.js';
 
 const local = { excluidos: [], programaSel: null, matricesMapa: null };
 const COL_NUC = 'Nucleos tematicos', COL_ASIG = 'Nombre asignatura o modulo';
@@ -110,13 +110,13 @@ function mapaIntegracion(filas, etiqueta, seleccion, rerender) {
     nucs[indice.get(f)].forEach(n => dic.get(a).add(claveNucleo(n)));
   }
   const sujetos = [...dic.keys()].sort();
-  const cabecera = [h('h3', {}, 'Mapa de integración entre asignaturas'),
-    h('p', { class: 'leyenda' }, 'Visualiza qué asignaturas comparten núcleos temáticos. Un nodo = una asignatura; una línea = al menos un núcleo en común; ' +
-      'el grosor indica cuántos. Útil para detectar redundancias, solapamientos u oportunidades de articulación curricular.'),
+  const cabecera = [h('h3', {}, 'Integración temática entre asignaturas'),
+    h('p', { class: 'leyenda' }, 'Muestra qué asignaturas declaran los mismos núcleos temáticos. Sirve para detectar redundancias, solapamientos u oportunidades de articulación curricular. ' +
+      'Puedes limitar el análisis a algunas matrices con el filtro.'),
     seleccion ? null : multiselect('Filtrar por matriz:', ids.map(i => etiqueta.get(i)), local.matricesMapa.map(i => etiqueta.get(i)),
       v => { local.matricesMapa = ids.filter(i => v.includes(etiqueta.get(i))); }),
-    seleccion ? null : h('button', { type: 'button', class: 'boton secundario', onclick: rerender }, 'Actualizar mapa')];
-  if (sujetos.length < 2) return [...cabecera, aviso('warning', 'Se necesitan al menos 2 asignaturas con núcleos temáticos para construir el mapa.')];
+    seleccion ? null : h('button', { type: 'button', class: 'boton secundario', onclick: rerender }, 'Actualizar')];
+  if (sujetos.length < 2) return [...cabecera, aviso('warning', 'Se necesitan al menos 2 asignaturas con núcleos temáticos para analizar su integración.')];
 
   // pares mediante índice invertido núcleo → asignaturas
   const inv = new Map();
@@ -137,47 +137,25 @@ function mapaIntegracion(filas, etiqueta, seleccion, rerender) {
   });
   if (!df.length) return [...cabecera, aviso('info', 'No se encontraron núcleos temáticos compartidos entre las asignaturas seleccionadas.')];
 
-  const grado = new Map();
-  df.forEach(r => { for (const s of [r['Asignatura 1'], r['Asignatura 2']]) grado.set(s, (grado.get(s) ?? 0) + r['Núcleos compartidos']); });
+  const grado = new Map(), conexiones = new Map();
+  df.forEach(r => { for (const s of [r['Asignatura 1'], r['Asignatura 2']]) { grado.set(s, (grado.get(s) ?? 0) + r['Núcleos compartidos']); conexiones.set(s, (conexiones.get(s) ?? 0) + 1); } });
   const aisladas = sujetos.filter(s => !grado.has(s));
-  const MAX = 40;
-  const top = sujetos.length > MAX ? [...grado].sort((a, b) => b[1] - a[1]).slice(0, MAX).map(x => x[0]) : sujetos;
-  const pos = new Map(top.map((s, i) => [s, [Math.cos(2 * Math.PI * i / top.length), Math.sin(2 * Math.PI * i / top.length)]]));
-  const maxComp = Math.max(...df.map(r => r['Núcleos compartidos']));
-  const PAL = ['#66c2a5', '#fc8d62', '#8da0cb', '#e78ac3', '#a6d854', '#ffd92f', '#e5c494', '#b3b3b3', '#b3e2cd', '#fdcdac', '#cbd5e8', '#f4cae4'];
-  const progs = [...new Set(top.map(s => prog.get(s)))].sort(cmp);
-  const aristas = df.filter(r => pos.has(r['Asignatura 1']) && pos.has(r['Asignatura 2'])).map(r => {
-    const [x1, y1] = pos.get(r['Asignatura 1']), [x2, y2] = pos.get(r['Asignatura 2']), n = r['Núcleos compartidos'];
-    return { type: 'scatter', mode: 'lines', x: [x1, x2], y: [y1, y2], hoverinfo: 'none', showlegend: false,
-      line: { width: Math.max(1, Math.min(8, n / maxComp * 8)), color: `rgba(100,100,100,${(0.15 + n / maxComp * 0.65).toFixed(2)})` } };
-  });
-  const nodos = progs.map((p, i) => {
-    const ss = top.filter(s => prog.get(s) === p);
-    return { type: 'scatter', mode: 'markers+text', name: corto(p ?? '', 35), x: ss.map(s => pos.get(s)[0]), y: ss.map(s => pos.get(s)[1]),
-      text: ss.map(s => corto(s, 22)), textposition: 'top center', textfont: { size: 8 }, hoverinfo: 'text',
-      hovertext: ss.map(s => `<b>${s}</b><br>Programa: ${prog.get(s)}<br>Peso de conexiones: ${grado.get(s) ?? 0}<br>Núcleos únicos: ${dic.get(s).size}`),
-      marker: { size: ss.map(s => 10 + Math.min(grado.get(s) ?? 0, 25)), color: PAL[i % PAL.length], line: { width: 1, color: 'white' } } };
-  });
-  const ocultos = { showgrid: false, zeroline: false, showticklabels: false };
+  const TOP = 15;
+  const articuladoras = [...conexiones].map(([s, n]) => ({ s, n, peso: grado.get(s), nucleos: dic.get(s).size, programa: prog.get(s) ?? 'N/A' }))
+    .sort((a, b) => b.n - a.n || b.peso - a.peso || cmp(a.s, b.s)).slice(0, TOP);
   const bloques = [...cabecera,
-    columnas(metrica('Asignaturas en el mapa', sujetos.length), metrica('Pares con núcleos compartidos', df.length),
+    columnas(metrica('Asignaturas analizadas', sujetos.length), metrica('Pares con núcleos compartidos', df.length, 'Dos asignaturas forman un par si declaran al menos un núcleo temático igual'),
       metrica('Asignaturas sin conexiones', aisladas.length)),
-    h('hr'), h('h3', {}, 'Red de integración temática'),
-    sujetos.length > MAX ? aviso('info', `Hay <b>${sujetos.length}</b> asignaturas. Mostrando las <b>${MAX}</b> con mayor conectividad temática.`) : null,
-    grafico([...aristas, ...nodos], { height: 660, showlegend: true, legend: { title: { text: 'Programa' }, x: 1.01, font: { size: 10 } },
-      xaxis: ocultos, yaxis: ocultos, plot_bgcolor: 'white', margin: { t: 20, b: 20, l: 20, r: 20 } }),
-    h('p', { class: 'leyenda' }, 'Lectura: el tamaño del nodo refleja el peso total de conexiones temáticas. Los nodos muy grandes son asignaturas ' +
-      'articuladoras; los aislados pueden indicar falta de integración con otras.')];
+    h('hr'), h('h3', {}, `Las ${articuladoras.length} asignaturas más articuladas`),
+    h('p', { class: 'leyenda' }, 'Dos asignaturas están conectadas cuando declaran al menos un núcleo temático en común. Cada barra indica con cuántas otras asignaturas se conecta la asignatura: ' +
+      'las más largas son las que más temas comparten con el resto del plan (candidatas a articular de forma explícita o a revisar por solapamiento). Pasa el cursor para ver su programa y sus núcleos.'),
+    grafico([{ type: 'bar', orientation: 'h', y: articuladoras.map(a => `${envolver(a.s, 40)}<br><i>${envolver(a.programa, 40)}</i>`), x: articuladoras.map(a => a.n), text: articuladoras.map(a => `${a.n} asignaturas`),
+      textposition: 'outside', cliponaxis: false, customdata: articuladoras.map(a => [a.programa, a.nucleos, a.peso]),
+      hovertemplate: '<b>%{y}</b><br>Conectada con %{x} asignaturas<br>%{customdata[1]} núcleos propios · %{customdata[2]} núcleos compartidos en total<extra></extra>',
+      marker: { color: articuladoras.map(a => a.n), colorscale: [[0, '#C8E6F5'], [1, '#0F385A']], showscale: false } }],
+    { height: Math.max(360, articuladoras.length * 52 + 70), yaxis: { autorange: 'reversed', automargin: true, tickfont: { size: 11 } },
+      xaxis: { title: 'Asignaturas con las que comparte al menos un núcleo temático', range: [0, Math.max(...articuladoras.map(a => a.n)) * 1.3] }, margin: { l: 10, r: 20, t: 10, b: 50 } })];
 
-  if (sujetos.length <= 35) {
-    const z = sujetos.map(() => sujetos.map(() => 0));
-    df.forEach(r => { const i = sujetos.indexOf(r['Asignatura 1']), j = sujetos.indexOf(r['Asignatura 2']); z[i][j] = z[j][i] = r['Núcleos compartidos']; });
-    bloques.push(h('hr'), h('h3', {}, 'Matriz de integración (núcleos compartidos)'),
-      h('p', { class: 'leyenda' }, 'Cada celda muestra cuántos núcleos comparten dos asignaturas. Valores altos indican integración alta o posible redundancia.'),
-      grafico([{ type: 'heatmap', z, x: sujetos.map(s => corto(s, 30)), y: sujetos.map(s => corto(s, 30)), colorscale: [[0, '#C8E6F5'], [1, '#0F385A']],
-        colorbar: { title: { text: 'Núcleos comunes' } } }],
-      { height: Math.max(400, sujetos.length * 18), xaxis: { tickangle: 45, tickfont: { size: 9 } }, yaxis: { tickfont: { size: 9 }, autorange: 'reversed' }, margin: { l: 200, b: 200, t: 20, r: 20 } }));
-  }
   const topPares = df.sort((a, b) => b['Núcleos compartidos'] - a['Núcleos compartidos']).slice(0, 20);
   bloques.push(h('hr'), h('h3', {}, 'Pares con mayor integración temática'),
     h('p', { class: 'leyenda' }, 'Asignaturas que comparten más núcleos: candidatas a articulación explícita o revisión de solapamiento.'),

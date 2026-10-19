@@ -33,26 +33,47 @@ export function asignaturasSinNucleos(filas) {
   return s;
 }
 
-export function alertas(filas, etiqueta) {
-  const out = [];
+/** Pregrado y posgrado se comparan por separado: sus mallas distribuyen distinto el tipo de saber. «Mixto» y «No identificado» no tienen grupo de referencia. */
+export const NIVELES = ['Pregrado', 'Posgrado'];
+export const MIN_GRUPO = 4;
+export const nivelDeFila = f => (NIVELES.includes(f.Nivel) ? f.Nivel : null);
+
+/** Porcentaje de cada tipo de saber por unidad (clave de la fila) y el nivel de esa unidad. */
+function pivotSaber(filas, clave) {
   const piv = new Map();
   for (const f of filas) {
     if (!TIPOS.includes(f['Tipo de Saber'])) continue;
-    if (!piv.has(f.Matriz)) piv.set(f.Matriz, { Saber: 0, SaberHacer: 0, SaberSer: 0, n: 0 });
-    const o = piv.get(f.Matriz); o[f['Tipo de Saber']]++; o.n++;
+    const k = f[clave];
+    if (!piv.has(k)) piv.set(k, { Saber: 0, SaberHacer: 0, SaberSer: 0, n: 0, nivel: nivelDeFila(f) });
+    const o = piv.get(k); o[f['Tipo de Saber']]++; o.n++;
   }
-  if (piv.size >= 4) {
+  return piv;
+}
+
+/** Hallazgos de Tipo de Saber: cada matriz de la vista se compara con las matrices de su mismo nivel (mediana y rango intercuartílico). `filasRef`: todo lo cargado. */
+function alertasTipoSaber(filas, etiqueta, filasRef) {
+  const out = [], visibles = new Set(filas.map(f => f.Matriz));
+  const piv = pivotSaber(filasRef, 'Matriz');
+  for (const nivel of NIVELES) {
+    const grupo = [...piv].filter(([, o]) => o.nivel === nivel);
+    if (grupo.length < MIN_GRUPO) continue;
     for (const t of TIPOS) {
-      const v = [...piv].map(([m, o]) => [m, 100 * o[t] / o.n]);
+      const v = grupo.map(([m, o]) => [m, 100 * o[t] / o.n]);
       const q1 = cuantil(v.map(x => x[1]), 0.25), q3 = cuantil(v.map(x => x[1]), 0.75), med = mediana(v.map(x => x[1]));
       for (const [m, p] of v) {
+        if (!visibles.has(m)) continue;
         if (p < q1 - 1.5 * (q3 - q1) || p > q3 + 1.5 * (q3 - q1)) {
-          out.push({ Matriz: m, Categoría: 'Tipo de Saber', Hallazgo: `${etiqueta.get(m) ?? m}: ${t} ${p.toFixed(0)}% se aparta del conjunto cargado (mediana ${med.toFixed(0)}%; P25–P75 ${q1.toFixed(0)}–${q3.toFixed(0)}%)`,
+          out.push({ Matriz: m, Categoría: 'Tipo de Saber', Nivel: nivel, Hallazgo: `${etiqueta.get(m) ?? m}: ${t} ${p.toFixed(0)}% se aparta de las ${grupo.length} matrices de ${nivel.toLowerCase()} cargadas (mediana ${med.toFixed(0)}%; P25–P75 ${q1.toFixed(0)}–${q3.toFixed(0)}%)`,
             Recomendación: 'Revisar si la diferencia responde a una decisión de diseño o a un error de diligenciamiento de la matriz.' });
         }
       }
     }
   }
+  return out;
+}
+
+export function alertas(filas, etiqueta, filasRef = filas) {
+  const out = alertasTipoSaber(filas, etiqueta, filasRef);
   const sinSem = filas.filter(f => f.Semestre == null || f.Semestre === '' || !Number.isFinite(Number(f.Semestre))).length;
   if (sinSem) out.push({ Matriz: null, Categoría: 'Completitud de datos', Hallazgo: `${sinSem} de ${filas.length} registros (${(100 * sinSem / filas.length).toFixed(0)} %) sin semestre reconocible`,
     Recomendación: 'Revisar el campo Semestre de esas asignaturas en el Paso 5 (valores vacíos o no numéricos).' });
@@ -103,7 +124,7 @@ export function calcularResumen({ filas, todasFilas, d, etiqueta, seleccion = nu
   if (g.estrategias) lectura.push(`<b>${g.estrategias_directa} de ${g.estrategias}</b> estrategias declaran indicadores de aprendizaje demostrado o de transferencia (N3–N4).`);
 
   // tendencias globales: presencia por asignatura y por programa
-  let tend = null, presencia = null;
+  let tend = null, presencia = null, principales = null;
   if (hayConfig()) {
     const T = configActual().TENDENCIAS_GLOBALES, acier = aciertosPorFila(todasFilas), r = resumirTendencias(filasVista, acier);
     const progs = new Set(filasVista.map(f => f.Programa));
@@ -118,27 +139,65 @@ export function calcularResumen({ filas, todasFilas, d, etiqueta, seleccion = nu
       const ps = [...presencia].filter(([, s]) => s.has(t)).length;
       return { Tendencia: T[t].descripcion, Asignaturas: r.conteo[t], '% de asignaturas': +r.cobertura[t].toFixed(1), Programas: ps, '% de programas': progs.size ? +(100 * ps / progs.size).toFixed(1) : 0 };
     }).sort((a, b) => a['% de asignaturas'] - b['% de asignaturas'] || a.Programas - b.Programas);
+    principales = principalesTendencias(filasVista, acier, T); principales.lectura = lecturaTendencias(principales);
     const ausentes = tend.filter(t => t.Asignaturas === 0).map(t => t.Tendencia);
     if (ausentes.length) lectura.push(`Tendencias globales sin presencia: ${ausentes.join(', ')}.`);
   }
 
   const kpis = [['Programas', new Set(filasVista.map(f => f.Programa)).size], ['Matrices', new Set(filasVista.map(f => f.Matriz)).size],
     ['Asignaturas', new Set(filasVista.map(f => f[COL_ASIG]).filter(x => x != null)).size], ['RA únicos', g.ra_unicos ?? 0], ['Estrategias (Paso 4)', g.estrategias ?? 0]];
-  const al = alertas(filasVista, etiqueta).filter(a => !seleccion || !a.Matriz || a.Matriz === seleccion);
-  return { vacio: false, vis, vista, todo, g, ref, filasVista, val, prioridades, conteo, lectura, tend, presencia, kpis, al };
+  const al = alertas(filasVista, etiqueta, todasFilas).filter(a => !seleccion || !a.Matriz || a.Matriz === seleccion);
+  return { vacio: false, vis, vista, todo, g, ref, filasVista, val, prioridades, conteo, lectura, tend, presencia, principales, kpis, al, perfilSin: { sin: nSinAl[0], total: nSinAl[1] } };
 }
 
-/** Porcentaje de cada tipo de saber por programa y su mediana entre programas (referencia descriptiva, sin umbrales). */
+/**
+ * Porcentaje de cada tipo de saber por programa y su mediana entre programas del MISMO nivel (pregrado y posgrado por separado; referencia descriptiva, sin umbrales).
+ * `medianas[nivel][tipo]` es null si el nivel no tiene programas; `nivel` dice a qué grupo pertenece cada programa (null si es mixto o no se identificó).
+ */
 export function tipoSaberPorPrograma(filas) {
-  const por = new Map();
-  for (const f of filas) {
-    if (!TIPOS.includes(f['Tipo de Saber'])) continue;
-    if (!por.has(f.Programa)) por.set(f.Programa, { Saber: 0, SaberHacer: 0, SaberSer: 0, n: 0 });
-    const o = por.get(f.Programa); o[f['Tipo de Saber']]++; o.n++;
-  }
-  const ts = new Map([...por].map(([p, o]) => [p, Object.fromEntries(TIPOS.map(t => [t, 100 * o[t] / o.n]))]));
-  const medianas = Object.fromEntries(TIPOS.map(t => [t, ts.size ? mediana([...ts.values()].map(x => x[t])) : null]));
-  return { ts, medianas };
+  const piv = pivotSaber(filas, 'Programa');
+  const ts = new Map([...piv].map(([p, o]) => [p, Object.fromEntries(TIPOS.map(t => [t, 100 * o[t] / o.n]))]));
+  const nivel = new Map([...piv].map(([p, o]) => [p, o.nivel]));
+  const nProgramas = Object.fromEntries(NIVELES.map(n => [n, [...nivel.values()].filter(x => x === n).length]));
+  const medianas = Object.fromEntries(NIVELES.map(n => [n, Object.fromEntries(TIPOS.map(t => {
+    const v = [...ts].filter(([p]) => nivel.get(p) === n).map(([, x]) => x[t]);
+    return [t, v.length ? mediana(v) : null];
+  }))]));
+  return { ts, nivel, medianas, nProgramas };
+}
+
+const nombreAsignatura = f => { const a = f[COL_ASIG]; const t = a == null ? '' : String(a).trim(); return t === 'nan' ? '' : t; };
+
+/**
+ * Principales tendencias globales: presencia de cada una (asignaturas únicas por nombre que la mencionan, y programas con al menos una), en el conjunto y por nivel
+ * (pregrado y posgrado por separado). `acier` viene de aciertosPorFila y `T` es TENDENCIAS_GLOBALES. Orden: de mayor a menor % de asignaturas del conjunto.
+ * Cuenta menciones por palabras clave en el nombre o el contenido; no juzga el enfoque de la asignatura.
+ */
+export function principalesTendencias(filas, acier, T) {
+  const grupos = { Total: filas, ...Object.fromEntries(NIVELES.map(n => [n, filas.filter(f => nivelDeFila(f) === n)])) };
+  const calcular = sub => {
+    const asig = new Set(), progs = new Set(), porT = Object.fromEntries(Object.keys(T).map(t => [t, { asig: new Set(), progs: new Set() }]));
+    for (const f of sub) {
+      const a = nombreAsignatura(f);
+      progs.add(f.Programa);
+      if (a) asig.add(a);
+      for (const t of Object.keys(acier.get(f) ?? {})) { if (a) porT[t].asig.add(a); porT[t].progs.add(f.Programa); }
+    }
+    return { asignaturas: asig.size, programas: progs.size, porT };
+  };
+  const calc = Object.fromEntries(Object.entries(grupos).map(([k, sub]) => [k, calcular(sub)]));
+  const celda = (k, t) => { const c = calc[k], x = c.porT[t]; return { pct: c.asignaturas ? 100 * x.asig.size / c.asignaturas : null, asignaturas: x.asig.size, programas: x.progs.size, pctProgramas: c.programas ? 100 * x.progs.size / c.programas : null }; };
+  const filasT = Object.keys(T).map(tid => ({ tid, Tendencia: T[tid].descripcion, ...Object.fromEntries(Object.keys(grupos).map(k => [k, celda(k, tid)])) }))
+    .sort((x, y) => (y.Total.pct ?? 0) - (x.Total.pct ?? 0) || y.Total.programas - x.Total.programas || x.Tendencia.localeCompare(y.Tendencia, 'es'));
+  return { filas: filasT, n: Object.fromEntries(Object.entries(calc).map(([k, c]) => [k, { asignaturas: c.asignaturas, programas: c.programas }])) };
+}
+
+/** Frase de lectura de las principales tendencias (HTML). */
+export function lecturaTendencias(r, cuantas = 3) {
+  const top = r.filas.slice(0, cuantas);
+  if (!top.length || !r.n.Total.asignaturas) return '';
+  const fmtP = v => (v === null ? '—' : `${v.toFixed(0)} %`);
+  return `Las más presentes: ${top.map(t => `<b>${t.Tendencia}</b> (${fmtP(t.Total.pct)} de las asignaturas; ${t.Total.programas} de ${r.n.Total.programas} programas)`).join('; ')}.`;
 }
 
 const SABERES = ['Saber', 'SaberHacer', 'SaberSer'];

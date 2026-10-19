@@ -106,6 +106,17 @@ export function grafico(trazas, layout = {}, config = {}) {
   return cont;
 }
 
+/** Parte un texto largo en varias líneas (<br>) para las etiquetas de los ejes: se leen completas en vez de recortarse con «…». */
+export function envolver(texto, ancho = 34) {
+  const lineas = [];
+  let actual = '';
+  for (const palabra of String(texto).split(/\s+/)) {
+    if (actual && `${actual} ${palabra}`.length > ancho) { lineas.push(actual); actual = palabra; } else actual = actual ? `${actual} ${palabra}` : palabra;
+  }
+  if (actual) lineas.push(actual);
+  return lineas.join('<br>');
+}
+
 /** Tabla Tabulator. */
 // Columnas que identifican un programa o una matriz: ancho fijo y el nombre se parte en varias líneas en vez de estirar la tabla.
 const COLUMNAS_ETIQUETA = new Set(['Matriz', 'Programa', 'Nombre del programa', 'Etiqueta', 'Matriz / programa']);

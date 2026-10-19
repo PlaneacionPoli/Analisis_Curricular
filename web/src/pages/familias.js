@@ -3,7 +3,7 @@
 // El modelo de tópicos (LDA) queda pendiente.
 import { compararInterPrograma, consolidarAsignaturas, deduplicarPares, divergenciaHomonimas, UMBRAL_SIMILAR } from '../data/compartidas.js';
 import { cmp } from '../data/util.js';
-import { aviso, columnas, grafico, h, info, metrica, tabla, titulo } from '../ui.js';
+import { aCsv, aviso, botonDescarga, columnas, descargar, envolver, grafico, h, info, metrica, tabla, titulo } from '../ui.js';
 
 const local = { pestana: 'Asignaturas homónimas', firma: '', calc: null };
 const COL = 'Nombre asignatura o modulo';
@@ -30,12 +30,19 @@ function compartidasPorNombre(filas) {
   return [...m].map(([Asignatura, ps]) => ({ Asignatura, programas: [...ps].sort(cmp), n: ps.size })).filter(x => x.n > 1).sort((a, b) => b.n - a.n || cmp(a.Asignatura, b.Asignatura));
 }
 
-function histograma(comp) {
-  const c = new Map();
-  comp.forEach(x => c.set(x.n, (c.get(x.n) ?? 0) + 1));
-  const ks = [...c.keys()].sort((a, b) => a - b);
-  return grafico([{ type: 'bar', x: ks, y: ks.map(k => c.get(k)), text: ks.map(k => c.get(k)), textposition: 'outside', marker: { color: '#1FB2DE' } }],
-    { height: 320, xaxis: { title: 'Programas que comparten la asignatura', dtick: 1 }, yaxis: { title: 'Cantidad de asignaturas' }, margin: { l: 50, r: 10, t: 20, b: 50 } });
+const TRAMOS = [['En 2 programas', 2, 2], ['En 3 programas', 3, 3], ['En 4 a 5 programas', 4, 5], ['En 6 a 10 programas', 6, 10], ['En 11 a 20 programas', 11, 20], ['En 21 o más programas', 21, Infinity]];
+
+/** ¿Cuántas asignaturas se comparten entre pocos programas y cuántas entre muchos? Barras por tramo, con la lectura escrita. */
+function distribucion(comp) {
+  const total = comp.length;
+  const tramos = TRAMOS.map(([etq, lo, hi]) => ({ etq, n: comp.filter(x => x.n >= lo && x.n <= hi).length })).filter(t => t.n > 0);
+  const pocos = comp.filter(x => x.n === 2).length, amplias = comp.filter(x => x.n >= 21);
+  const lectura = `${pocos} de ${total} asignaturas (${(100 * pocos / total).toFixed(0)} %) están en solo 2 programas.` +
+    (amplias.length ? ` ${amplias.length} están en 21 o más programas (${amplias.slice(0, 5).map(x => `${x.Asignatura}: ${x.n}`).join('; ')}${amplias.length > 5 ? '…' : ''}): son las más transversales.` : '');
+  return [h('p', { class: 'leyenda' }, `Cada barra agrupa las asignaturas compartidas según en cuántos programas aparecen. ${lectura}`),
+    grafico([{ type: 'bar', orientation: 'h', y: tramos.map(t => t.etq), x: tramos.map(t => t.n), text: tramos.map(t => `${t.n} asignaturas (${(100 * t.n / total).toFixed(0)} %)`), textposition: 'outside', cliponaxis: false,
+      hovertemplate: '%{y}<br>%{x} asignaturas<extra></extra>', marker: { color: '#1FB2DE' } }],
+    { height: 60 * tramos.length + 90, yaxis: { autorange: 'reversed', automargin: true }, xaxis: { title: 'Número de asignaturas', range: [0, Math.max(...tramos.map(t => t.n)) * 1.35] }, margin: { l: 10, r: 20, t: 10, b: 50 } })];
 }
 
 function tablaHomonimas(homo) {
@@ -62,20 +69,19 @@ function vistaConjunto({ cab, filas, rerender }) {
   const programas = [...new Set(filas.map(f => f.Programa))].sort(cmp);
   const { homo, pares } = calcular(filas, 'conjunto');
   const pivote = comp.map(x => ({ Asignatura: x.Asignatura, 'Total Programas': x.n, ...Object.fromEntries(programas.map(p => [p, x.programas.includes(p) ? 'X' : ''])) }));
-  const heat = comp.slice(0, 120);
   const divergentes = homo.filter(x => x.divergente);
   return h('div', {}, ...cab,
     comp.length ? h('div', {},
       columnas(metrica('Asignaturas compartidas', comp.length)),
       h('p', { class: 'leyenda' }, `De ${programas.length} programas cargados, ${comp.length} asignaturas se repiten (mismo nombre) en 2 o más programas.`),
-      tabla(pivote, [{ title: 'Asignatura', field: 'Asignatura', minWidth: 260, frozen: true }, { title: 'Total', field: 'Total Programas', hozAlign: 'right', width: 80 },
-        ...programas.map(p => ({ title: p, field: p, hozAlign: 'center', width: 70, headerSort: false }))], { height: 420, nestedFieldSeparator: false }),
-      h('hr'), h('h3', {}, 'Mapa de calor: asignaturas × programas'),
-      comp.length > heat.length ? h('p', { class: 'leyenda' }, `Se muestran las ${heat.length} más compartidas de ${comp.length}.`) : null,
-      grafico([{ type: 'heatmap', z: heat.map(x => programas.map(p => (x.programas.includes(p) ? 1 : 0))), x: programas.map(p => p.slice(0, 30)), y: heat.map(x => x.Asignatura.slice(0, 60)),
-        colorscale: [[0, '#C8E6F5'], [1, '#0F385A']], showscale: false, hovertemplate: '%{y}<br>%{x}<extra></extra>' }],
-      { height: Math.max(300, heat.length * 16 + 140), margin: { l: 280, r: 20, t: 20, b: 160 }, xaxis: { tickangle: 40, tickfont: { size: 9 } }, yaxis: { autorange: 'reversed', tickfont: { size: 9 } } }),
-      h('hr'), h('h3', {}, 'Asignaturas por cantidad de programas'), histograma(comp))
+      h('h3', {}, 'Asignaturas compartidas y programas donde están'),
+      h('p', { class: 'leyenda' }, 'Una fila por asignatura, con los nombres completos de los programas que la ofrecen. Se puede buscar escribiendo en el encabezado de «Asignatura». ' +
+        'Si prefieres la matriz con una columna por programa, descárgala en CSV.'),
+      tabla(comp.map(x => ({ Asignatura: x.Asignatura, 'N.º de programas': x.n, 'Programas en los que está': x.programas.join('; ') })),
+        [{ title: 'Asignatura', field: 'Asignatura', width: 320, headerFilter: 'input', formatter: 'textarea' }, { title: 'N.º de programas', field: 'N.º de programas', hozAlign: 'right', width: 130 },
+          { title: 'Programas en los que está', field: 'Programas en los que está', minWidth: 520, formatter: 'textarea', headerFilter: 'input' }], { height: 460, nestedFieldSeparator: false }),
+      botonDescarga('Descargar la matriz asignatura × programa (CSV)', () => descargar('asignaturas_compartidas.csv', aCsv(pivote, ['Asignatura', 'Total Programas', ...programas]), 'text/csv')),
+      h('hr'), h('h3', {}, 'Cuántos programas comparten cada asignatura'), ...distribucion(comp))
       : aviso('success', 'No se encontraron asignaturas compartidas entre programas.'),
     h('hr'), h('h3', {}, 'Consistencia de contenido entre programas'),
     h('div', { class: 'pestanas' }, ...['Asignaturas homónimas', 'Nombre distinto, contenido similar'].map(p =>
