@@ -9,6 +9,14 @@ import { ceder } from './util.js';
 export const SEDES = ['PBOG', 'PMED', 'VNAL', 'HMED', 'HBOG', 'HVAL'];
 const GENERICA = 'fenomenos contemporaneos';
 export const NIVELES = ['N1 Implementación', 'N2 Percepción y reacción', 'N3 Aprendizaje demostrado', 'N4 Transferencia', 'N5 Efecto externo'];
+/** Qué significa cada nivel de evidencia de un indicador del Paso 4 (libro de códigos de V5 del artículo). */
+export const NIVELES_DEFINICION = [
+  { nivel: NIVELES[0], tipo: 'Indirecta', queMide: 'Cuántas veces se ejecuta la estrategia o cuántos participan, empresas o productos genera, sin juzgar su calidad. Es el nivel por defecto.', ejemplo: 'Número de estudiantes que participan en la estrategia.' },
+  { nivel: NIVELES[1], tipo: 'Indirecta', queMide: 'Qué opinan los participantes: valoración, satisfacción o utilidad percibida. Mide una opinión, no un desempeño.', ejemplo: 'Valoración del nivel de aporte de la estrategia a los resultados de aprendizaje del programa.' },
+  { nivel: NIVELES[2], tipo: 'Directa', queMide: 'Qué demuestra el estudiante: conocimiento, habilidad o desempeño evaluado con un criterio, un umbral, una comparación, jurados o rúbrica. Incluye entornos simulados.', ejemplo: 'Aprueban con promedio superior a 450/500 el módulo de práctica en ambiente simulado.' },
+  { nivel: NIVELES[3], tipo: 'Directa', queMide: 'Si el estudiante aplica lo aprendido en la práctica o en un contexto real (práctica profesional, empresa, usuarios reales). Contar participantes no basta.', ejemplo: 'Ningún indicador de las matrices llega a este nivel.' },
+  { nivel: NIVELES[4], tipo: 'Efecto externo', queMide: 'Qué ocurre fuera del aula: vinculación laboral, empleabilidad o efecto en la organización, el sector o la comunidad. Se reporta aparte de V5.', ejemplo: 'Estudiantes vinculados laboralmente en actividades jurídicas.' },
+];
 
 const NO_OBSERVABLES = new Set(['conocer', 'comprender', 'entender', 'reflexionar', 'valorar', 'apreciar', 'interiorizar', 'sensibilizar', 'concientizar',
   'percibir', 'aceptar', 'respetar', 'saber', 'creer', 'pensar', 'sentir', 'asumir', 'apropiar', 'apropiarse', 'familiarizarse', 'considerar']);

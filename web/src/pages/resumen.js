@@ -9,7 +9,7 @@ import { porGrupo } from '../data/taxonomias.js';
 import { aviso, botonDescarga, columnas, descargar, grafico, h, info, kpi, metrica, panel, selector, tabla, titulo } from '../ui.js';
 import { actualizar } from '../store.js';
 import { cargarLogo, contextoInformes, nombreArchivoPdf, pdfGeneral, pdfPrograma, programasDe, zipInformes } from '../export/informesDatos.js';
-import { datosIndicadores, paginaIndicadores } from './indicadores.js';
+import { datosIndicadores, paginaIndicadores, tablaNiveles } from './indicadores.js';
 import { taxonomiasRA } from './taxonomias.js';
 import { asociacionRA, cadenaCompetencias, calcularResumen, NIVELES, recomendacionesMatriz, tipoSaberPorPrograma } from './resumenDatos.js';
 import { calcularFaltantes, estadoLote, modoPerfil } from '../perfil/lote.js';
@@ -166,7 +166,9 @@ export function paginaResumen({ filas, todasFilas, archivos, archivoDe, etiqueta
 
 const ir = pagina => () => { actualizar({ pagina }); window.scrollTo?.(0, 0); };
 const enlace = (texto, pagina) => h('button', { type: 'button', class: 'boton secundario', onclick: ir(pagina) }, `${texto} →`);
-const ICONO_V = { V1: 'person-check', V2: 'diagram-3', V3: 'check2-circle', V4: 'signpost-split', V5: 'bar-chart' };
+// cada variable conserva su ícono y su color en todo el Resumen; el estado (cumple, parcial) se indica aparte con 🟢 🟡 🔴
+const ICONO_V = { V1: 'person-badge', V2: 'puzzle', V3: 'clipboard-check', V4: 'link-45deg', V5: 'speedometer2' };
+const COLOR_V = { V1: '#1FB2DE', V2: '#0F385A', V3: '#17B3B3', V4: '#FBAF17', V5: '#EC0677' };
 const COLOR_NIVEL = { Pregrado: '#1FB2DE', Posgrado: '#0F385A', 'Sin nivel': '#8A94A0' };
 const MEDALLA = { Cumple: '#1FB2DE', Parcial: '#FBAF17', 'No cumple': '#EC0677' };
 const ORDEN_ESTADO = ['Cumple', 'Parcial', 'No cumple', 'Sin dato'];
@@ -208,14 +210,14 @@ const EVIDENCIA = { N1: 'Indirecta', N2: 'Indirecta', N3: 'Directa', N4: 'Direct
 const tablaCorta = (filas, primera = 'Matriz') => tabla(filas, Object.keys(filas[0]).map(c => ({ title: c, field: c, ...(c === primera ? {} : { hozAlign: 'center', minWidth: 110 }) })), { height: false });
 const subtitulo = t => h('h4', {}, t);
 
-function seccionVariable({ v, nombre, regla, kpis, lectura, nota, desglose = [], vinculos = [], color }) {
+function seccionVariable({ v, nombre, regla, kpis, lectura, nota, desglose = [], vinculos = [], color, abierto = false }) {
   const cuerpo = desglose.filter(Boolean);
   // la lectura va primero: es la frase que resume la variable para quien solo lee el comienzo de la sección
   return panel({ titulo: `${v} · ${nombre}`, bajada: regla },
     lectura ? h('p', { class: 'lectura', html: `<i class="bi bi-lightbulb"></i> ${lectura}` }) : null,
-    columnas(...kpis.map(k => kpi({ icono: ICONO_V[v], color, ...k }))),
+    columnas(...kpis.map(k => kpi({ icono: ICONO_V[v], color, clase: 'compacto', ...k }))),
     nota ? h('p', { class: 'leyenda' }, nota) : null,
-    cuerpo.length ? h('details', {}, h('summary', {}, 'Ver desglose'), ...cuerpo) : null,
+    cuerpo.length ? h('details', { open: abierto ? true : null }, h('summary', {}, 'Ver desglose'), ...cuerpo) : null,
     h('div', {}, ...vinculos));
 }
 
@@ -224,13 +226,14 @@ function estadoConjunto({ R, d, cad, aso, etiqueta, exig }) {
   const n = prioridades.length, vars = CRITERIOS.map(([v]) => v), pm = vista.por_matriz, nom = id => etiqueta.get(id) ?? id;
   const ids = new Set(pm.map(m => m.Matriz));
   const cumple = v => conteo.find(c => c[1] === v)[2].Cumple;
-  const colorDe = v => (conteo.find(c => c[1] === v)[2]['No cumple'] ? MEDALLA['No cumple'] : cumple(v) < n ? MEDALLA.Parcial : MEDALLA.Cumple);
+  const colorDe = v => COLOR_V[v];
+  const estadoDe = v => (conteo.find(c => c[1] === v)[2]['No cumple'] ? '🔴' : cumple(v) < n ? '🟡' : '🟢');
   const nombres = Object.fromEntries(CRITERIOS), reglas = Object.fromEntries(CRITERIOS.map(c => [c[0], c[2]]));
   const fuertes = conteo.filter(c => c[2].Cumple === n).map(c => c[1]), debiles = conteo.filter(c => c[2].Cumple < n);
   const veredicto = `<b>${fuertes.length} de ${conteo.length} criterios se cumplen en las ${n} matrices</b>${fuertes.length ? ` (${fuertes.join(', ')})` : ''}. ` +
     (debiles.length ? `Requieren atención: ${debiles.map(c => `<b>${c[1]}</b> (${c[2].Cumple} de ${n} matrices cumplen)`).join('; ')}.` : '');
   const resultados = { V1: g.V1, V2: g.V2_comp, V3: g.V3, V4: g.V4, V5: g.V5 };
-  const semaforo = columnas(...vars.map(v => kpi({ icono: ICONO_V[v], etiqueta: `${v} · ${nombres[v]}`, valor: fp(resultados[v]), color: colorDe(v), nota: `${cumple(v)} de ${n} matrices cumplen`,
+  const semaforo = columnas(...vars.map(v => kpi({ icono: ICONO_V[v], etiqueta: `${v} · ${nombres[v]}`, valor: fp(resultados[v]), color: colorDe(v), clase: 'compacto', nota: `${estadoDe(v)} ${cumple(v)} de ${n} matrices cumplen`,
     ayuda: 'El porcentaje es sobre atributos, competencias, RA o estrategias; el conteo, sobre matrices.' })));
   const porMatriz = (filas, clave) => { const c = new Map(); filas.forEach(f => c.set(f[clave], (c.get(f[clave]) ?? 0) + 1)); return c; };
 
@@ -269,18 +272,16 @@ function estadoConjunto({ R, d, cad, aso, etiqueta, exig }) {
 
   // ── V3: evaluabilidad de los RA (R3) y exigencia (descriptiva) ──────────────────────────────────────────────
   const noEval = vista.ra.filter(r => !r.V3), porM3 = porMatriz(noEval, 'matriz');
-  const ex = Object.entries(exig ?? {}).filter(([id, x]) => ids.has(id) && x !== null && x !== undefined).map(([, x]) => x);
   const seccionV3 = seccionVariable({ v: 'V3', nombre: nombres.V3, color: colorDe('V3'),
     regla: `${reglas.V3}: el RA inicia con un verbo observable (en SaberSer se admite el verbo afectivo) y declara la finalidad del desempeño o el producto esperado.`,
     lectura: noEval.length ? `<b>${noEval.length} RA</b> no son evaluables, en ${porM3.size} matrices.` : `Los ${miles(g.ra_unicos)} RA únicos son evaluables en las ${n} matrices; V3 no distingue entre programas.`,
     kpis: [{ etiqueta: 'RA evaluables', valor: fp(g.V3), nota: `${miles(g.ra_unicos - noEval.length)} de ${miles(g.ra_unicos)} RA únicos` },
       { etiqueta: 'RA no evaluables', valor: miles(noEval.length), nota: noEval.length ? `en ${porM3.size} matrices` : 'todos cumplen ambos criterios' },
       { etiqueta: 'Matrices que cumplen', valor: `${cumple('V3')} de ${n}`, nota: 'todos sus RA evaluables' },
-      { etiqueta: 'Exigencia de los RA', valor: ex.length ? mediana(ex).toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—', nota: ex.length ? `índice 0–100, mediana por matriz (${Math.min(...ex).toFixed(1)} a ${Math.max(...ex).toFixed(1)}); descriptivo` : 'se calcula al abrir Taxonomías' }],
-    nota: 'La exigencia es descriptiva: la adecuada depende del nivel de formación; no es un criterio de la plantilla.',
+      { etiqueta: 'RA por matriz (mediana)', valor: miles(Math.round(mediana(pm.map(m => m['RA únicos'])) ?? 0)), nota: `de ${miles(Math.min(...pm.map(m => m['RA únicos'])))} a ${miles(Math.max(...pm.map(m => m['RA únicos'])))} RA únicos` }],
     desglose: [noEval.length ? subtitulo('Matrices con RA no evaluables') : null,
       noEval.length ? tablaCorta([...porM3].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([m, c]) => ({ Matriz: nom(m), 'RA no evaluables': c }))) : aviso('success', 'Todos los RA cumplen ambos criterios.')],
-    vinculos: [boton('Ver la taxonomía y la exigencia de los RA', ir('Taxonomías'))] });
+    vinculos: [boton('Ver la taxonomía y los niveles declarados de los RA', ir('Taxonomías'))] });
 
   // ── V4: trazabilidad de los RA hasta una estrategia con instrumento (R4, Tabla 9) ───────────────────────────
   const ras = vista.ra, delPrograma = ras.filter(r => !r.generica), genericos = ras.filter(r => r.generica);
@@ -306,36 +307,31 @@ function estadoConjunto({ R, d, cad, aso, etiqueta, exig }) {
   // ── V5: indicadores de las estrategias y nivel de evidencia (R5, Tabla 10) ──────────────────────────────────
   const est = vista.estrategias, conIns = est.filter(e => e.indicadores > 0 && e.instrumento).length;
   const porNivel = k => est.filter(e => e.nivel_max?.slice(0, 2) === k).length, indNivel = k => Object.entries(g.niveles ?? {}).filter(([nv]) => nv.slice(0, 2) === k).reduce((s, [, c]) => s + c, 0);
-  const tabla10 = [...NIVELES_EVIDENCIA.map(nv => { const k = nv.slice(0, 2); return { Nivel: nv, 'Tipo de evidencia': EVIDENCIA[k], 'Estrategias (nivel más alto)': porNivel(k), '%': fp(pc(porNivel(k), est.length)), Indicadores: miles(indNivel(k)) }; }),
-    { Nivel: 'Total', 'Tipo de evidencia': '', 'Estrategias (nivel más alto)': est.length, '%': fp(est.length ? 100 : null), Indicadores: miles(g.indicadores) }];
+  const valores10 = Object.fromEntries(NIVELES_EVIDENCIA.map(nv => { const k = nv.slice(0, 2); return [k, { 'Estrategias (nivel más alto)': porNivel(k), '%': fp(pc(porNivel(k), est.length)), Indicadores: miles(indNivel(k)) }]; }));
+  const total10 = { 'Estrategias (nivel más alto)': est.length, '%': fp(est.length ? 100 : null), Indicadores: miles(g.indicadores) };
   const directas = porMatriz(est.filter(e => e.directa), 'matriz'), n12 = porNivel('N1') + porNivel('N2');
   const v5m = pm.filter(m => m['V5 %'] !== null && m['V5 %'] !== undefined && m['V5 %'] < 100).sort((a, b) => a['V5 %'] - b['V5 %'] || nom(a.Matriz).localeCompare(nom(b.Matriz), 'es'));
   const seccionV5 = seccionVariable({ v: 'V5', nombre: nombres.V5, color: colorDe('V5'),
     regla: `${reglas.V5}. Además se describe el nivel de evidencia de los indicadores (N1 implementación a N5 efecto externo); la plantilla no exige un nivel mínimo.`,
-    lectura: `${conIns === est.length ? 'Todas las estrategias declaran indicador e instrumento' : `${miles(est.length - conIns)} estrategias no declaran indicador o instrumento`}, pero ${fp(pc(n12, est.length))} solo aportan evidencia de implementación o percepción (N1–N2); <b>${g.estrategias_directa}</b> aportan evidencia directa del logro (N3–N4)${directas.size ? `, en ${directas.size} matrices` : ''}.`,
+    lectura: `${conIns === est.length ? 'Todas las estrategias declaran indicador e instrumento' : `${miles(est.length - conIns)} estrategias no declaran indicador o instrumento`}, pero ${fp(pc(n12, est.length))} solo aportan evidencia indirecta (N1 implementación: cuántos participan; N2 percepción: qué opinan); <b>${g.estrategias_directa}</b> aportan evidencia directa del logro del estudiante (N3 aprendizaje demostrado o N4 transferencia)${directas.size ? `, en ${directas.size} matrices` : ''}.`,
     kpis: [{ etiqueta: 'Con indicador e instrumento', valor: fp(pc(conIns, est.length)), nota: `${miles(conIns)} de ${miles(est.length)} estrategias (requisito de la plantilla)` },
-      { etiqueta: 'Evidencia N2 o superior (V5)', valor: fp(g.V5), nota: `${miles(est.filter(e => e.V5).length)} de ${miles(est.length)} estrategias` },
-      { etiqueta: 'Evidencia directa N3–N4', valor: `${g.estrategias_directa} de ${miles(g.estrategias)}`, nota: `${fp(pc(g.estrategias_directa, g.estrategias))} de las estrategias` },
-      { etiqueta: 'Indicadores', valor: miles(g.indicadores), nota: `${miles(indNivel('N1'))} N1 · ${miles(indNivel('N2'))} N2 · ${miles(indNivel('N3') + indNivel('N4') + indNivel('N5'))} N3 o más` }],
-    desglose: [subtitulo('Indicadores de logro por nivel de evidencia'), tablaCorta(tabla10, 'Nivel'),
+      { etiqueta: 'Más que implementación (V5)', valor: fp(g.V5), nota: `${miles(est.filter(e => e.V5).length)} de ${miles(est.length)} estrategias llegan a N2 o más` },
+      { etiqueta: 'Evidencia directa (N3–N4)', valor: `${g.estrategias_directa} de ${miles(g.estrategias)}`, nota: `${fp(pc(g.estrategias_directa, g.estrategias))} de las estrategias` },
+      { etiqueta: 'Indicadores', valor: miles(g.indicadores), nota: `${miles(indNivel('N1'))} de implementación · ${miles(indNivel('N2'))} de percepción · ${miles(indNivel('N3') + indNivel('N4') + indNivel('N5'))} de aprendizaje o más` }],
+    abierto: true,
+    desglose: [subtitulo('Qué significa cada nivel de evidencia y cuántos indicadores hay en cada uno'), tablaNiveles(valores10, total10),
       directas.size ? subtitulo('Matrices con estrategias de evidencia directa (N3–N4)') : null,
       directas.size ? tablaCorta([...directas].sort((a, b) => b[1] - a[1]).map(([m, c]) => ({ Matriz: nom(m), 'Estrategias con evidencia directa': c }))) : null,
       v5m.length ? subtitulo('Matrices con menor proporción de estrategias N2 o superior') : null,
       v5m.length ? tablaCorta(v5m.slice(0, 5).map(m => ({ Matriz: nom(m.Matriz), 'Estrategias N2 o superior': fp(m['V5 %']), Estrategias: m.Estrategias }))) : null],
     vinculos: [boton('Ver el detalle de V2 a V5', irPestana('Detalle por indicador'))] });
 
-  // ── Comparación entre sedes (R7, Tabla 11): ¿dónde actuar, por sede o a nivel institucional? ────────────────
-  const porSede = sedes.map(s => { const x = pm.filter(m => m.Sede === s), med = c => { const v = x.map(m => m[c]).filter(y => y !== null && y !== undefined); return v.length ? fp(mediana(v)) : '—'; };
-    return { Sede: s, Matrices: x.length, 'V1 (mediana)': med('V1 %'), 'V4 (mediana)': med('V4 %'), 'V5 (mediana)': med('V5 %'), 'Con verbo repetido': x.filter(m => m.V2 === 'No').length }; });
   const top = prioridades.filter(p => p['No cumple'] + p.Parcial > 0).slice(0, 5);
   return h('div', {},
     aviso('info', veredicto),
     h('p', { class: 'leyenda' }, alcance.map(([e, v]) => `${miles(v)} ${e.toLowerCase()}`).join(' · ')),
     semaforo,
     seccionV1, seccionV2, seccionV3, seccionV4, seccionV5,
-    h('h3', {}, 'Comparación entre sedes'),
-    h('p', { class: 'leyenda' }, 'Mediana de cada variable por matriz en cada sede. Si las sedes se parecen, las mejoras se plantean a nivel institucional y no por sede.'),
-    tablaCorta(porSede, 'Sede'),
     h('h3', {}, 'Dónde actuar primero'),
     h('p', { class: 'leyenda' }, 'Las cinco matrices con más criterios en «No cumple» o «Parcial». El listado completo está en la pestaña «Listados de revisión».'),
     top.length ? tabla(top.map(p => ({ Matriz: p.Etiqueta, ...Object.fromEntries(CRITERIOS.map(([v, e]) => [`${v} ${e}`, ICONO[p[v]]])) })),

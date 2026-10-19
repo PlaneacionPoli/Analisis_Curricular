@@ -121,6 +121,12 @@ select, .ms summary {
 .kpi-etiqueta { font-size: .78rem; text-transform: uppercase; letter-spacing: .08em; color: var(--gris); font-weight: 600; }
 .kpi-valor { font-size: 2rem; font-weight: 800; line-height: 1.1; letter-spacing: -.02em; }
 .kpi-nota { font-size: .78rem; color: var(--gris); }
+/* ficha compacta: cifras más pequeñas para secciones con varias fichas por fila */
+.kpi.compacto { gap: .7rem; padding: .75rem .9rem; }
+.kpi.compacto .kpi-icono { width: 38px; height: 38px; font-size: 1.1rem; border-radius: 11px; }
+.kpi.compacto .kpi-etiqueta { font-size: .68rem; letter-spacing: .06em; }
+.kpi.compacto .kpi-valor { font-size: 1.4rem; letter-spacing: -.01em; }
+.kpi.compacto .kpi-nota { font-size: .72rem; }
 
 .panel { background: #fff; border: 1px solid var(--borde); border-radius: 16px; padding: 1rem 1.2rem 1.1rem; box-shadow: 0 4px 18px rgba(15, 56, 90, .05); min-width: 0; }
 .panel > header h3 { margin: 0; font-size: 1.02rem; }

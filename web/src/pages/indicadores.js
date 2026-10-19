@@ -1,6 +1,6 @@
 // Página «Indicadores V1–V5»: ruta de alineación, valoración por criterios, trazabilidad, niveles de evidencia.
 // Conjunto = lo que reporta el artículo; matriz = una unidad programa-sede frente a la mediana de TODAS las matrices cargadas.
-import { agregar, calcularIndicadores, CRITERIOS_EVALUADOS as CRITERIOS, ESTADOS_CRITERIO, NIVELES, referenciasConjunto, valorarMatriz } from '../data/indicadores.js';
+import { agregar, calcularIndicadores, CRITERIOS_EVALUADOS as CRITERIOS, ESTADOS_CRITERIO, NIVELES, NIVELES_DEFINICION, referenciasConjunto, valorarMatriz } from '../data/indicadores.js';
 import { mediana } from '../data/estadistica.js';
 import { cmp } from '../data/util.js';
 import { perfilEnCache } from '../perfil/servicio.js';
@@ -9,7 +9,7 @@ import { panelV1 } from './panelV1.js';
 import { indicadoresPerfil } from '../perfil/indicadores.js';
 import { libroIndicadores } from '../export/libros.js';
 import { MIME_XLSX } from '../export/excelMarca.js';
-import { aviso, botonDescarga, columnas, descargar, grafico, h, info, metrica, selector, tabla, titulo } from '../ui.js';
+import { aviso, botonDescarga, columnas, descargar, envolver, grafico, h, info, metrica, selector, tabla, titulo } from '../ui.js';
 
 const local = { firma: '', res: null, cargando: false, avance: null, error: null, v1: {}, perfil: {}, enCache: new Set(), versionLote: 0, v1Firma: '', matrizVal: null, leyendo: false, v1Leido: false, ultimaLectura: 0 };
 const COLOR_ESTADO = { Cumple: '#1FB2DE', Parcial: '#FBAF17', 'No cumple': '#EC0677', 'Sin dato': '#8A94A0' };
@@ -83,10 +83,10 @@ function ruta(g, ref = null) {
     ['Estrategia con indicador e instrumento', estInd, `${g.estrategias} estrategias`, '#8A94A0', ref?.IND],
   ].filter(x => x[1] !== null && x[1] !== undefined);
   const inv = [...cadena].reverse();
-  return grafico([{ type: 'bar', orientation: 'h', x: inv.map(x => x[1]), y: inv.map(x => x[0]), marker: { color: inv.map(x => x[3]) },
+  return grafico([{ type: 'bar', orientation: 'h', x: inv.map(x => x[1]), y: inv.map(x => envolver(x[0], 38)), marker: { color: inv.map(x => x[3]) },
     text: inv.map(x => `${x[1].toFixed(0)} %  (${x[2]})`), textposition: 'outside', cliponaxis: false, name: 'Valor' },
-  ...(ref ? [{ type: 'scatter', mode: 'markers', x: inv.map(x => x[4] ?? null), y: inv.map(x => x[0]), name: 'Mediana del conjunto', marker: { symbol: 'diamond', size: 12, color: '#FBAF17', line: { width: 1, color: '#0F385A' } } }] : [])],
-  { height: 60 * cadena.length + 80, xaxis: { range: [0, 125], ticksuffix: ' %' }, margin: { l: 10, r: 10, t: 10, b: 10 }, plot_bgcolor: 'white', showlegend: !!ref, legend: { orientation: 'h', y: -0.1 } });
+  ...(ref ? [{ type: 'scatter', mode: 'markers', x: inv.map(x => x[4] ?? null), y: inv.map(x => envolver(x[0], 38)), name: 'Mediana del conjunto', marker: { symbol: 'diamond', size: 12, color: '#FBAF17', line: { width: 1, color: '#0F385A' } } }] : [])],
+  { height: 70 * cadena.length + 90, xaxis: { range: [0, 125], ticksuffix: ' %', automargin: true }, yaxis: { automargin: true, tickfont: { size: 11 } }, margin: { l: 10, r: 20, t: 10, b: 50 }, plot_bgcolor: 'white', showlegend: !!ref, legend: { orientation: 'h', y: -0.15 } });
 }
 
 function figValoracion(val) {
@@ -115,6 +115,19 @@ function stripPlot(porMatriz) {
     return { type: 'scatter', mode: 'markers', name: s, x: pts.map(p => p.x), y: pts.map(p => p.v), text: pts.map(p => p.n), hovertemplate: '%{text}<br>%{x}%<extra></extra>',
       marker: { color: PAL[i % PAL.length], opacity: 0.7, size: 9 } };
   }), { height: 320, xaxis: { range: [-3, 103], ticksuffix: ' %', title: 'Valor por matriz' }, yaxis: { type: 'category', categoryarray: vars }, margin: { l: 60, r: 10, t: 10, b: 40 } });
+}
+
+/**
+ * Tabla de los cinco niveles de evidencia con su definición y un ejemplo real, más las cifras que se le pasen.
+ * `valores`: {N1: {columna: valor, …}, …}; `total`: fila opcional con las mismas columnas.
+ */
+export function tablaNiveles(valores, total = null) {
+  const extra = Object.keys(valores.N1 ?? {});
+  const filas = NIVELES_DEFINICION.map(d => ({ Nivel: d.nivel, 'Qué mide': d.queMide, 'Tipo de evidencia': d.tipo, ...(valores[d.nivel.slice(0, 2)] ?? {}), 'Ejemplo en las matrices': d.ejemplo }));
+  if (total) filas.push({ Nivel: 'Total', 'Qué mide': '', 'Tipo de evidencia': '', ...total, 'Ejemplo en las matrices': '' });
+  const texto = { formatter: 'textarea', variableHeight: true };
+  return tabla(filas, [{ title: 'Nivel', field: 'Nivel', width: 150, ...texto }, { title: 'Qué mide', field: 'Qué mide', minWidth: 300, ...texto }, { title: 'Evidencia', field: 'Tipo de evidencia', width: 105 },
+    ...extra.map(c => ({ title: c, field: c, hozAlign: 'right', width: 120, ...texto })), { title: 'Ejemplo en las matrices', field: 'Ejemplo en las matrices', minWidth: 280, ...texto }], { height: false });
 }
 
 function tablaSimple(filas, cols, altura = false) {
@@ -197,8 +210,9 @@ export function paginaIndicadores({ filas, archivos, archivoDe, etiqueta, selecc
       h('div', {}, h('h3', {}, 'Trazabilidad por clase de RA (V4)'), tablaSimple(clases),
         sinEst.length ? h('details', {}, h('summary', {}, `RA de programa sin estrategia mesocurricular (${sinEst.length})`), tablaSimple(sinEst, null, 320)) : null),
       h('div', {}, h('h3', {}, 'Indicadores del Paso 4 por nivel de evidencia (V5)'),
-        tablaSimple(niv.map(([Nivel, Indicadores]) => ({ Nivel, Indicadores, '%': Math.round(1000 * Indicadores / totalNiv) / 10 }))),
-        h('p', { class: 'leyenda' }, 'N1 implementación · N2 percepción · N3 aprendizaje demostrado · N4 transferencia · N5 efecto externo.'))),
+        h('p', { class: 'leyenda' }, 'Cada indicador se clasifica según la evidencia que aporta del logro del RA; la plantilla no exige un nivel mínimo.'))),
+    tablaNiveles(Object.fromEntries(niv.map(([nv, c]) => [nv.slice(0, 2), { Indicadores: c, '%': `${(Math.round(1000 * c / totalNiv) / 10).toLocaleString('es-CO', { minimumFractionDigits: 1 })} %` }])),
+      { Indicadores: totalNiv, '%': '100,0 %' }),
     h('hr'),
     botonDescarga('Descargar indicadores V1–V5 (Excel)', () => excel(vista, val, etiqueta, seleccion ? `Matriz: ${etiqueta.get(seleccion) ?? seleccion}` : 'Conjunto de las matrices de la vista')));
 }
@@ -231,5 +245,6 @@ function vistaMatriz({ g, vista, todo, ref, val, seleccion, etiqueta, incrustada
     h('h3', {}, 'Indicadores del Paso 4 por nivel de evidencia'),
     grafico([{ type: 'bar', x: niv.map(x => x.n), y: niv.map(x => x.v), text: niv.map(x => x.v), textposition: 'outside', marker: { color: ['#8A94A0', '#FBAF17', '#1FB2DE', '#0F385A', '#EC0677'] } }],
       { height: 300, yaxis: { title: 'Indicadores' }, margin: { l: 50, r: 10, t: 10, b: 60 } }),
+    tablaNiveles(Object.fromEntries(niv.map((x, i) => [`N${i + 1}`, { Indicadores: x.v }]))),
     h('p', { class: 'leyenda' }, `${g.estrategias_directa} de ${g.estrategias} estrategias con aprendizaje demostrado o transferencia (N3–N4).`));
 }

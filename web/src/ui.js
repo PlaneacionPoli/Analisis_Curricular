@@ -52,8 +52,8 @@ export function metrica(etiqueta, valor, ayuda) {
 }
 
 /** Indicador destacado: icono, cifra grande, etiqueta y una nota de contexto. */
-export function kpi({ icono: ic, etiqueta, valor, nota = '', color = '#1fb2de', ayuda = '' }) {
-  return h('div', { class: 'kpi', title: ayuda, style: { '--c': color } },
+export function kpi({ icono: ic, etiqueta, valor, nota = '', color = '#1fb2de', ayuda = '', clase = '' }) {
+  return h('div', { class: `kpi ${clase}`.trim(), title: ayuda, style: { '--c': color } },
     h('div', { class: 'kpi-icono' }, icono(ic)),
     h('div', { class: 'kpi-cuerpo' },
       h('div', { class: 'kpi-etiqueta' }, etiqueta),
