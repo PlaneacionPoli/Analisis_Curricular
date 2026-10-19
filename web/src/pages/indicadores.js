@@ -34,7 +34,10 @@ async function leerV1(archivoDe, rerender) {
     const ind = indicadoresPerfil(r.items);
     if (!ind.Atributos) continue;
     v1[id] = [ind.n_alguna, ind.Atributos];
-    perfil[id] = { sin: ind['% Sin asociación'], tres: ind['% Tres capas'], nSin: ind.n_sin, n: ind.Atributos };
+    // desglose que reporta el artículo (Tabla 8): por tipo de perfil y por capa; cada grupo = [atributos, alguna capa, tres capas, competencias, RA, asignaturas]
+    const ev = r.items.filter(i => i.evaluable), esProf = i => /^prof/i.test(String(i.perfil ?? ''));
+    const grupo = f => { const x = ev.filter(f); return [x.length, x.filter(i => i.capas_con_respaldo >= 1).length, x.filter(i => i.capas_con_respaldo === 3).length, x.filter(i => i.Competencia).length, x.filter(i => i.RA).length, x.filter(i => i.Asignatura).length]; };
+    perfil[id] = { sin: ind['% Sin asociación'], tres: ind['% Tres capas'], nSin: ind.n_sin, n: ind.Atributos, porPerfil: { Profesional: grupo(esProf), Ocupacional: grupo(i => !esProf(i)) } };
   }
   const cambio = JSON.stringify(v1) !== JSON.stringify(local.v1) || enCache.size !== local.enCache.size;
   local.v1 = v1; local.perfil = perfil; local.enCache = enCache; local.leyendo = false; local.v1Leido = true; local.ultimaLectura = performance.now();

@@ -2,7 +2,8 @@
 // Todo sale de los archivos cargados y de los filtros activos; son propuestas para validar por el comité.
 import { libroResumen } from '../export/libros.js';
 import { MIME_XLSX } from '../export/excelMarca.js';
-import { CRITERIOS_EVALUADOS as CRITERIOS } from '../data/indicadores.js';
+import { CRITERIOS_EVALUADOS as CRITERIOS, NIVELES as NIVELES_EVIDENCIA, SEDES } from '../data/indicadores.js';
+import { mediana } from '../data/estadistica.js';
 import { cargarConfig, hayConfig } from '../data/tendencias.js';
 import { porGrupo } from '../data/taxonomias.js';
 import { aviso, botonDescarga, columnas, descargar, grafico, h, info, kpi, metrica, panel, selector, tabla, titulo } from '../ui.js';
@@ -100,7 +101,8 @@ export function paginaResumen({ filas, todasFilas, archivos, archivoDe, etiqueta
   if (lote.corriendo) return h('div', {}, ...cab, panelV1({ archivoDe, faltan: d.faltanPerfil, rerender }));
 
   local.rerender = rerender;
-  const R = calcularResumen({ filas, todasFilas, d, etiqueta, seleccion, exigencia: exigenciaPorMatriz(archivos, filas, todasFilas, rerender) });
+  const exig = exigenciaPorMatriz(archivos, filas, todasFilas, rerender);
+  const R = calcularResumen({ filas, todasFilas, d, etiqueta, seleccion, exigencia: exig });
   if (R.vacio) return h('div', {}, ...cab, aviso('warning', 'Ninguna matriz de la vista tiene los Pasos 2, 3 y 4 legibles.'));
   const { vista, g, ref, val, prioridades, conteo, lectura, tend, kpis, al } = R;
   const cad = cadenaCompetencias(d.matrices.filter(m => R.vis.has(m.matriz) && (!seleccion || m.matriz === seleccion)), R.filasVista, etiqueta);
@@ -116,7 +118,7 @@ export function paginaResumen({ filas, todasFilas, archivos, archivoDe, etiqueta
   if (!matricesVista.includes(local.matriz)) local.matriz = matricesVista[0] ?? null;
   const sel = seleccion ?? local.matriz;
 
-  const resumen = estadoConjunto({ R, todasFilas });
+  const resumen = estadoConjunto({ R, d, cad, aso, etiqueta, exig });
   const listados = h('div', {},
     h('p', { class: 'leyenda' }, 'Listados completos que respaldan los hallazgos de la pestaña «Estado del conjunto». Aquí se revisan matriz por matriz.'),
     h('h3', {}, 'Valoración V1–V5 por matriz'),
@@ -140,7 +142,9 @@ export function paginaResumen({ filas, todasFilas, archivos, archivoDe, etiqueta
       : aviso('success', 'No se detectaron alertas de tipo de saber ni de completitud de datos.'),
     tend ? h('details', {}, h('summary', {}, `Presencia de las ${tend.length} tendencias globales (de menor a mayor)`),
       h('p', { class: 'leyenda' }, 'No existe un mínimo institucional de cobertura, por lo que ninguna tendencia se califica como baja. La tabla las ordena para que el comité decida cuáles reforzar.'),
-      tabla(tend, Object.keys(tend[0]).map(c => ({ title: c, field: c, ...(c === 'Tendencia' ? { minWidth: 240 } : { hozAlign: 'right' }) })), { height: false })) : null);
+      tabla(tend, Object.keys(tend[0]).map(c => ({ title: c, field: c, ...(c === 'Tendencia' ? { minWidth: 240 } : { hozAlign: 'right' }) })), { height: false })) : null,
+    h('hr'),
+    bloqueTendencias(R.principales));
   const accionesPdf = h('div', {},
     seccionPdf({ filas, todasFilas, d, etiqueta, archivoDe, archivos, descripcionFiltros }, matricesVista, rerender),
     h('hr'),
@@ -192,61 +196,151 @@ function bloqueTendencias(pt) {
   enlace('Ver todas las tendencias, asignaturas y palabras clave en Tendencias Globales', 'Tendencias Globales'));
 }
 
-/** Pestaña «Estado del conjunto»: veredicto, semáforo V1–V5, inteligencia artificial, hallazgos clave y dónde actuar primero. */
-function estadoConjunto({ R, todasFilas }) {
-  const { g, principales, prioridades, conteo, kpis, al, tend, perfilSin } = R;
-  const n = prioridades.length, vars = CRITERIOS.map(([v]) => v);
+/**
+ * Pestaña «Estado del conjunto» (resumen ejecutivo): una sección por variable, V1 a V5, con el orden y las cifras que reporta el artículo (R1–R5).
+ * Cada sección da la lectura en una frase, cuatro cifras y, plegado, el desglose del artículo (Tablas 8–10) y lo que hay que atender.
+ */
+const fp = v => (v === null || v === undefined || Number.isNaN(v) ? '—' : `${v.toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 })} %`);
+const pc = (a, b) => (b ? 100 * a / b : null);
+const irPestana = nombre => () => { local.pestana = nombre; window.scrollTo?.(0, 0); local.rerender?.(); };
+const boton = (texto, alClic) => h('button', { type: 'button', class: 'boton secundario', onclick: alClic }, `${texto} →`);
+const EVIDENCIA = { N1: 'Indirecta', N2: 'Indirecta', N3: 'Directa', N4: 'Directa', N5: 'Efecto externo' };
+const tablaCorta = (filas, primera = 'Matriz') => tabla(filas, Object.keys(filas[0]).map(c => ({ title: c, field: c, ...(c === primera ? {} : { hozAlign: 'center', minWidth: 110 }) })), { height: false });
+const subtitulo = t => h('h4', {}, t);
+
+function seccionVariable({ v, nombre, regla, kpis, lectura, nota, desglose = [], vinculos = [], color }) {
+  const cuerpo = desglose.filter(Boolean);
+  // la lectura va primero: es la frase que resume la variable para quien solo lee el comienzo de la sección
+  return panel({ titulo: `${v} · ${nombre}`, bajada: regla },
+    lectura ? h('p', { class: 'lectura', html: `<i class="bi bi-lightbulb"></i> ${lectura}` }) : null,
+    columnas(...kpis.map(k => kpi({ icono: ICONO_V[v], color, ...k }))),
+    nota ? h('p', { class: 'leyenda' }, nota) : null,
+    cuerpo.length ? h('details', {}, h('summary', {}, 'Ver desglose'), ...cuerpo) : null,
+    h('div', {}, ...vinculos));
+}
+
+function estadoConjunto({ R, d, cad, aso, etiqueta, exig }) {
+  const { g, vista, prioridades, conteo, kpis: alcance } = R;
+  const n = prioridades.length, vars = CRITERIOS.map(([v]) => v), pm = vista.por_matriz, nom = id => etiqueta.get(id) ?? id;
+  const ids = new Set(pm.map(m => m.Matriz));
   const cumple = v => conteo.find(c => c[1] === v)[2].Cumple;
+  const colorDe = v => (conteo.find(c => c[1] === v)[2]['No cumple'] ? MEDALLA['No cumple'] : cumple(v) < n ? MEDALLA.Parcial : MEDALLA.Cumple);
+  const nombres = Object.fromEntries(CRITERIOS), reglas = Object.fromEntries(CRITERIOS.map(c => [c[0], c[2]]));
   const fuertes = conteo.filter(c => c[2].Cumple === n).map(c => c[1]), debiles = conteo.filter(c => c[2].Cumple < n);
   const veredicto = `<b>${fuertes.length} de ${conteo.length} criterios se cumplen en las ${n} matrices</b>${fuertes.length ? ` (${fuertes.join(', ')})` : ''}. ` +
-    (debiles.length ? `Requieren atención: ${debiles.map(c => `<b>${c[1]}</b> (${c[2].Cumple} de ${n} matrices cumplen)`).join('; ')}. ` : '') +
-    (principales?.filas.length ? `Tendencias más presentes: ${principales.filas.slice(0, 3).map(t => `<b>${t.Tendencia}</b> (${t.Total.pct === null ? '—' : t.Total.pct.toFixed(0)} %)`).join(', ')}.` : '');
-  const color = v => (conteo.find(c => c[1] === v)[2]['No cumple'] ? MEDALLA['No cumple'] : cumple(v) < n ? MEDALLA.Parcial : MEDALLA.Cumple);
-  const nombres = Object.fromEntries(CRITERIOS);
-  const valores = { V1: [g.V1, `${miles(g.atributos_perfil)} atributos evaluables`], V2: [g.V2_comp, `${miles(g.competencias_especificas)} competencias específicas`], V3: [g.V3, `${miles(g.ra_unicos)} RA únicos`],
-    V4: [g.V4, `sin el RA genérico: ${fmt(g.V4_programa)}`], V5: [g.V5, `${miles(g.estrategias)} estrategias`] };
-  const semaforo = columnas(...vars.map(v => kpi({ icono: ICONO_V[v], etiqueta: `${v} · ${nombres[v]}`, valor: fmt(valores[v][0]), color: color(v),
-    nota: `${cumple(v)} de ${n} matrices cumplen · ${valores[v][1]}`, ayuda: 'El porcentaje es sobre atributos, RA, competencias o estrategias; el conteo, sobre matrices.' })));
+    (debiles.length ? `Requieren atención: ${debiles.map(c => `<b>${c[1]}</b> (${c[2].Cumple} de ${n} matrices cumplen)`).join('; ')}.` : '');
+  const resultados = { V1: g.V1, V2: g.V2_comp, V3: g.V3, V4: g.V4, V5: g.V5 };
+  const semaforo = columnas(...vars.map(v => kpi({ icono: ICONO_V[v], etiqueta: `${v} · ${nombres[v]}`, valor: fp(resultados[v]), color: colorDe(v), nota: `${cumple(v)} de ${n} matrices cumplen`,
+    ayuda: 'El porcentaje es sobre atributos, competencias, RA o estrategias; el conteo, sobre matrices.' })));
+  const porMatriz = (filas, clave) => { const c = new Map(); filas.forEach(f => c.set(f[clave], (c.get(f[clave]) ?? 0) + 1)); return c; };
 
-  const med = tipoSaberPorPrograma(todasFilas).medianas;
-  const txtMed = N => `${N.toLowerCase()} ${['Saber', 'SaberHacer', 'SaberSer'].map(t => (med[N][t] === null ? '—' : med[N][t].toFixed(0))).join('/')}`;
-  const alTS = al.filter(a => a.Categoría === 'Tipo de Saber');
-  const nAlNivel = N => new Set(alTS.filter(a => a.Nivel === N).map(a => a.Matriz)).size;
-  const generico = g.ra_sin_estrategia - g.ra_sin_estrategia_programa;
-  const tarjetas = [
-    { icono: 'person-check', etiqueta: 'Perfil de egreso sin alineación', valor: perfilSin.total ? `${miles(perfilSin.sin)} de ${miles(perfilSin.total)}` : '—', color: '#FBAF17',
-      nota: perfilSin.total ? `${(100 * perfilSin.sin / perfilSin.total).toFixed(0)} % de los atributos no llegan a competencias, RA ni asignaturas` : 'Sin atributos evaluables', pagina: 'Perfil de Egreso (V1)' },
-    { icono: 'signpost-split', etiqueta: 'RA sin estrategia mesocurricular', valor: miles(g.ra_sin_estrategia), color: '#FBAF17',
-      nota: `${miles(generico)} son el RA genérico institucional y ${miles(g.ra_sin_estrategia_programa)} son de programa`, pagina: 'Cobertura Temática' },
-    { icono: 'bar-chart', etiqueta: 'Evidencia de aprendizaje demostrado', valor: `${g.estrategias_directa} de ${g.estrategias}`, color: '#EC0677',
-      nota: 'estrategias con indicadores N3–N4 (aprendizaje demostrado o transferencia)', pagina: null },
-    { icono: 'pie-chart', etiqueta: 'Tipo de saber frente a su nivel', valor: `${nAlNivel('Pregrado') + nAlNivel('Posgrado')} matriz(ces)`, color: '#1FB2DE',
-      nota: `se apartan de su propio nivel (pregrado ${nAlNivel('Pregrado')}, posgrado ${nAlNivel('Posgrado')}). Mediana Saber/Hacer/Ser: ${NIVELES.map(txtMed).join(' · ')}`, pagina: 'Tipo de Saber' },
-    tend?.length ? { icono: 'graph-up-arrow', etiqueta: 'Tendencias con menor presencia', valor: `${tend.filter(t => t.Asignaturas === 0).length} sin asignaturas`, color: '#42F2F2',
-      nota: `la de menor presencia es ${tend[0].Tendencia} (${tend[0]['% de asignaturas']} % de las asignaturas)`, pagina: 'Tendencias Globales' } : null,
-  ].filter(Boolean);
-  const card = t => h('div', {}, kpi(t), t.pagina ? enlace('Ver detalle', t.pagina) : null);
+  // ── V1: correspondencia del perfil con competencias, RA y asignaturas (R1, Tabla 8) ─────────────────────────
+  const pf = Object.entries(d.perfil).filter(([id, p]) => ids.has(id) && p.porPerfil).map(([, p]) => p);
+  const suma = k => pf.reduce((a, p) => a.map((x, i) => x + p.porPerfil[k][i]), [0, 0, 0, 0, 0, 0]);
+  const prof = suma('Profesional'), ocu = suma('Ocupacional'), tot = prof.map((x, i) => x + ocu[i]);
+  const fila8 = (Perfil, x) => ({ Perfil, Atributos: miles(x[0]), Competencias: fp(pc(x[3], x[0])), RA: fp(pc(x[4], x[0])), Asignaturas: fp(pc(x[5], x[0])), 'Alguna capa (V1)': fp(pc(x[1], x[0])), 'Tres capas': fp(pc(x[2], x[0])), 'Ninguna capa': fp(pc(x[0] - x[1], x[0])) });
+  const v1m = pm.filter(m => m['V1 %'] !== null && m['V1 %'] !== undefined).sort((a, b) => a['V1 %'] - b['V1 %'] || nom(a.Matriz).localeCompare(nom(b.Matriz), 'es'));
+  const v1s = v1m.map(m => m['V1 %']), sinAlguna = v1m.filter(m => m['V1 %'] < 100).length;
+  const seccionV1 = !tot[0] ? seccionVariable({ v: 'V1', nombre: nombres.V1, regla: reglas.V1, kpis: [], desglose: [aviso('info', 'Aún no hay datos de V1: falta calcular el perfil de egreso de las matrices.')], color: colorDe('V1') })
+    : seccionVariable({
+      v: 'V1', nombre: nombres.V1, regla: reglas.V1, color: colorDe('V1'),
+      lectura: `<b>${miles(tot[0] - tot[1])} de ${miles(tot[0])} atributos</b> (${fp(pc(tot[0] - tot[1], tot[0]))}) del perfil no se alinean con ninguna capa; ${sinAlguna} de ${n} matrices tienen al menos uno. La más baja: ${nom(v1m[0].Matriz)} (${fp(v1m[0]['V1 %'])}).`,
+      kpis: [{ etiqueta: 'Alguna capa (V1)', valor: fp(g.V1), nota: `${miles(tot[1])} de ${miles(tot[0])} atributos del perfil` },
+        { etiqueta: 'Las tres capas a la vez', valor: fp(pc(tot[2], tot[0])), nota: 'competencias, RA y asignaturas' },
+        { etiqueta: 'Con alguna asignatura', valor: fp(pc(tot[5], tot[0])), nota: `con alguna competencia ${fp(pc(tot[3], tot[0]))} · con algún RA ${fp(pc(tot[4], tot[0]))}` },
+        { etiqueta: 'V1 por matriz (mediana)', valor: fp(mediana(v1s)), nota: `de ${fp(Math.min(...v1s))} a ${fp(Math.max(...v1s))} · ${v1m.filter(m => m['V1 %'] >= 100).length} matrices con todo alineado` }],
+      nota: 'V1 se calcula con el método de asociación del perfil (léxico y modelo semántico); su acuerdo con una lectura de referencia está pendiente de validación por el comité curricular.',
+      desglose: [subtitulo('Alineación por tipo de perfil y capa curricular'), tablaCorta([fila8('Profesional', prof), fila8('Ocupacional', ocu), fila8('Total', tot)], 'Perfil'),
+        subtitulo('Matrices con menor V1'), tablaCorta(v1m.slice(0, 5).map(m => ({ Matriz: nom(m.Matriz), V1: fp(m['V1 %']), 'Atributos sin alineación': `${d.perfil[m.Matriz]?.nSin ?? '—'} de ${d.perfil[m.Matriz]?.n ?? '—'}` })))],
+      vinculos: [boton('Ver los atributos sin alineación en Perfil de Egreso', ir('Perfil de Egreso (V1)'))] });
 
+  // ── V2: competencias alineadas con RA y coherencia horizontal (R2) ──────────────────────────────────────────
+  const rc = cad.resumen, rep = pm.filter(m => m.V2 === 'No');
+  const seccionV2 = seccionVariable({ v: 'V2', nombre: nombres.V2, color: colorDe('V2'),
+    regla: `${reglas.V2}. El artículo analiza además la coherencia horizontal: que las competencias específicas de un programa no repitan el verbo rector.`,
+    lectura: `${g.V2_comp >= 100 ? 'Todas las' : `${fp(g.V2_comp)} de las`} ${miles(g.competencias_especificas)} competencias específicas tienen RA; ${rep.length ? `<b>${rep.length} de ${n} matrices</b> repiten un verbo entre competencias específicas` : 'ninguna matriz repite un verbo entre competencias específicas'}${rc.sinRA ? `; ${rc.sinRA} combinaciones competencia × tipo de saber no tienen RA` : ' y ninguna omite un tipo de saber'}.`,
+    kpis: [{ etiqueta: 'Competencias específicas con RA', valor: fp(g.V2_comp), nota: `${miles(g.competencias_especificas)} competencias específicas` },
+      { etiqueta: 'Matrices sin verbo repetido', valor: fp(pc(n - rep.length, n)), nota: `${rep.length} de ${n} repiten un verbo (coherencia horizontal)` },
+      { etiqueta: 'Competencias del perfil', valor: miles(rc.competencias), nota: `${miles(rc.competencias - rc.genericas)} específicas · ${miles(rc.genericas)} genéricas (institucional)` },
+      { etiqueta: 'Sin RA de un tipo de saber', valor: miles(rc.sinRA), nota: 'competencia × tipo de saber (Saber, SaberHacer, SaberSer)' }],
+    desglose: [rep.length ? subtitulo('Matrices que repiten un verbo entre competencias específicas') : null,
+      rep.length ? tablaCorta(rep.map(m => ({ Matriz: nom(m.Matriz), 'Verbo repetido': m['Verbos repetidos'] }))) : aviso('success', 'Ninguna matriz repite un verbo entre sus competencias específicas.')],
+    vinculos: [boton('Ver el detalle de V2 a V5', irPestana('Detalle por indicador'))] });
+
+  // ── V3: evaluabilidad de los RA (R3) y exigencia (descriptiva) ──────────────────────────────────────────────
+  const noEval = vista.ra.filter(r => !r.V3), porM3 = porMatriz(noEval, 'matriz');
+  const ex = Object.entries(exig ?? {}).filter(([id, x]) => ids.has(id) && x !== null && x !== undefined).map(([, x]) => x);
+  const seccionV3 = seccionVariable({ v: 'V3', nombre: nombres.V3, color: colorDe('V3'),
+    regla: `${reglas.V3}: el RA inicia con un verbo observable (en SaberSer se admite el verbo afectivo) y declara la finalidad del desempeño o el producto esperado.`,
+    lectura: noEval.length ? `<b>${noEval.length} RA</b> no son evaluables, en ${porM3.size} matrices.` : `Los ${miles(g.ra_unicos)} RA únicos son evaluables en las ${n} matrices; V3 no distingue entre programas.`,
+    kpis: [{ etiqueta: 'RA evaluables', valor: fp(g.V3), nota: `${miles(g.ra_unicos - noEval.length)} de ${miles(g.ra_unicos)} RA únicos` },
+      { etiqueta: 'RA no evaluables', valor: miles(noEval.length), nota: noEval.length ? `en ${porM3.size} matrices` : 'todos cumplen ambos criterios' },
+      { etiqueta: 'Matrices que cumplen', valor: `${cumple('V3')} de ${n}`, nota: 'todos sus RA evaluables' },
+      { etiqueta: 'Exigencia de los RA', valor: ex.length ? mediana(ex).toLocaleString('es-CO', { minimumFractionDigits: 1, maximumFractionDigits: 1 }) : '—', nota: ex.length ? `índice 0–100, mediana por matriz (${Math.min(...ex).toFixed(1)} a ${Math.max(...ex).toFixed(1)}); descriptivo` : 'se calcula al abrir Taxonomías' }],
+    nota: 'La exigencia es descriptiva: la adecuada depende del nivel de formación; no es un criterio de la plantilla.',
+    desglose: [noEval.length ? subtitulo('Matrices con RA no evaluables') : null,
+      noEval.length ? tablaCorta([...porM3].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([m, c]) => ({ Matriz: nom(m), 'RA no evaluables': c }))) : aviso('success', 'Todos los RA cumplen ambos criterios.')],
+    vinculos: [boton('Ver la taxonomía y la exigencia de los RA', ir('Taxonomías'))] });
+
+  // ── V4: trazabilidad de los RA hasta una estrategia con instrumento (R4, Tabla 9) ───────────────────────────
+  const ras = vista.ra, delPrograma = ras.filter(r => !r.generica), genericos = ras.filter(r => r.generica);
+  const c4 = a => (a.length ? `${fp(pc(a.filter(r => r.V4).length, a.length))} (${a.filter(r => r.V4).length}/${a.length})` : '—');
+  const sedes = [...new Set(ras.map(r => r.sede))].sort((a, b) => (SEDES.indexOf(a) + 1 || 99) - (SEDES.indexOf(b) + 1 || 99));
+  const tabla9 = [...sedes.map(s => ({ Sede: s, 'RA de programa': c4(delPrograma.filter(r => r.sede === s)), 'RA genérico': c4(genericos.filter(r => r.sede === s)), 'Todos los RA': c4(ras.filter(r => r.sede === s)) })),
+    { Sede: 'Total', 'RA de programa': c4(delPrograma), 'RA genérico': c4(genericos), 'Todos los RA': c4(ras) }];
+  const sinProg = porMatriz(delPrograma.filter(r => !r.V4), 'matriz'), v4s = pm.map(m => m['V4 %']).filter(x => x !== null && x !== undefined);
+  const generico = g.ra_sin_estrategia - g.ra_sin_estrategia_programa, ra = aso.resumen, microMed = mediana(aso.filas.map(f => f['Asignaturas con estrategias micro (Paso 5)']));
+  const seccionV4 = seccionVariable({ v: 'V4', nombre: nombres.V4, color: colorDe('V4'),
+    regla: `${reglas.V4}. Se distingue el RA de programa del RA de la competencia genérica institucional.`,
+    lectura: `<b>${miles(g.ra_sin_estrategia)} RA</b> no llegan a una estrategia mesocurricular con instrumento: ${miles(generico)} son el RA genérico institucional (${genericos.length ? `solo ${fp(pc(g.genericos_con_estrategia, g.ra_genericos))} lo tiene` : 'ninguna matriz lo declara'}) y ${miles(g.ra_sin_estrategia_programa)} son de programa (V4 de programa: ${fp(g.V4_programa)}).`,
+    kpis: [{ etiqueta: 'RA con estrategia', valor: fp(g.V4), nota: `${miles(g.ra_unicos - g.ra_sin_estrategia)} de ${miles(g.ra_unicos)} RA únicos` },
+      { etiqueta: 'RA de programa', valor: fp(g.V4_programa), nota: `${miles(delPrograma.filter(r => r.V4).length)} de ${miles(delPrograma.length)} RA` },
+      { etiqueta: 'RA genérico institucional', valor: genericos.length ? fp(pc(g.genericos_con_estrategia, g.ra_genericos)) : '—', nota: `${g.genericos_con_estrategia} de ${g.ra_genericos} RA` },
+      { etiqueta: 'Competencias sin estrategia', valor: miles(rc.sinEstrategia), nota: `competencia × tipo de saber · ${miles(rc.sinEstrategiaGenericas)} genéricas, ${miles(rc.sinEstrategiaEspecificas)} específicas` }],
+    nota: `V4 por matriz: ${v4s.length ? `${fp(Math.min(...v4s))} a ${fp(Math.max(...v4s))}, mediana ${fp(mediana(v4s))}` : '—'}. Nivel micro: ${miles(ra.ambas + ra.micro)} de ${miles(ra.total)} RA se trabajan en asignaturas con actividades de aprendizaje, evaluación o retroalimentación (mediana: ${microMed ?? '—'} asignaturas por RA).`,
+    desglose: [subtitulo('Trazabilidad por sede y clase de RA'), tablaCorta(tabla9, 'Sede'),
+      sinProg.size ? subtitulo('Matrices con RA de programa sin estrategia') : null,
+      sinProg.size ? tablaCorta([...sinProg].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([m, c]) => ({ Matriz: nom(m), 'RA de programa sin estrategia': c }))) : null],
+    vinculos: [boton('Ver los RA y competencias sin estrategia', irPestana('Listados de revisión')), ' ', boton('Ver el detalle de V2 a V5', irPestana('Detalle por indicador'))] });
+
+  // ── V5: indicadores de las estrategias y nivel de evidencia (R5, Tabla 10) ──────────────────────────────────
+  const est = vista.estrategias, conIns = est.filter(e => e.indicadores > 0 && e.instrumento).length;
+  const porNivel = k => est.filter(e => e.nivel_max?.slice(0, 2) === k).length, indNivel = k => Object.entries(g.niveles ?? {}).filter(([nv]) => nv.slice(0, 2) === k).reduce((s, [, c]) => s + c, 0);
+  const tabla10 = [...NIVELES_EVIDENCIA.map(nv => { const k = nv.slice(0, 2); return { Nivel: nv, 'Tipo de evidencia': EVIDENCIA[k], 'Estrategias (nivel más alto)': porNivel(k), '%': fp(pc(porNivel(k), est.length)), Indicadores: miles(indNivel(k)) }; }),
+    { Nivel: 'Total', 'Tipo de evidencia': '', 'Estrategias (nivel más alto)': est.length, '%': fp(est.length ? 100 : null), Indicadores: miles(g.indicadores) }];
+  const directas = porMatriz(est.filter(e => e.directa), 'matriz'), n12 = porNivel('N1') + porNivel('N2');
+  const v5m = pm.filter(m => m['V5 %'] !== null && m['V5 %'] !== undefined && m['V5 %'] < 100).sort((a, b) => a['V5 %'] - b['V5 %'] || nom(a.Matriz).localeCompare(nom(b.Matriz), 'es'));
+  const seccionV5 = seccionVariable({ v: 'V5', nombre: nombres.V5, color: colorDe('V5'),
+    regla: `${reglas.V5}. Además se describe el nivel de evidencia de los indicadores (N1 implementación a N5 efecto externo); la plantilla no exige un nivel mínimo.`,
+    lectura: `${conIns === est.length ? 'Todas las estrategias declaran indicador e instrumento' : `${miles(est.length - conIns)} estrategias no declaran indicador o instrumento`}, pero ${fp(pc(n12, est.length))} solo aportan evidencia de implementación o percepción (N1–N2); <b>${g.estrategias_directa}</b> aportan evidencia directa del logro (N3–N4)${directas.size ? `, en ${directas.size} matrices` : ''}.`,
+    kpis: [{ etiqueta: 'Con indicador e instrumento', valor: fp(pc(conIns, est.length)), nota: `${miles(conIns)} de ${miles(est.length)} estrategias (requisito de la plantilla)` },
+      { etiqueta: 'Evidencia N2 o superior (V5)', valor: fp(g.V5), nota: `${miles(est.filter(e => e.V5).length)} de ${miles(est.length)} estrategias` },
+      { etiqueta: 'Evidencia directa N3–N4', valor: `${g.estrategias_directa} de ${miles(g.estrategias)}`, nota: `${fp(pc(g.estrategias_directa, g.estrategias))} de las estrategias` },
+      { etiqueta: 'Indicadores', valor: miles(g.indicadores), nota: `${miles(indNivel('N1'))} N1 · ${miles(indNivel('N2'))} N2 · ${miles(indNivel('N3') + indNivel('N4') + indNivel('N5'))} N3 o más` }],
+    desglose: [subtitulo('Indicadores de logro por nivel de evidencia'), tablaCorta(tabla10, 'Nivel'),
+      directas.size ? subtitulo('Matrices con estrategias de evidencia directa (N3–N4)') : null,
+      directas.size ? tablaCorta([...directas].sort((a, b) => b[1] - a[1]).map(([m, c]) => ({ Matriz: nom(m), 'Estrategias con evidencia directa': c }))) : null,
+      v5m.length ? subtitulo('Matrices con menor proporción de estrategias N2 o superior') : null,
+      v5m.length ? tablaCorta(v5m.slice(0, 5).map(m => ({ Matriz: nom(m.Matriz), 'Estrategias N2 o superior': fp(m['V5 %']), Estrategias: m.Estrategias }))) : null],
+    vinculos: [boton('Ver el detalle de V2 a V5', irPestana('Detalle por indicador'))] });
+
+  // ── Comparación entre sedes (R7, Tabla 11): ¿dónde actuar, por sede o a nivel institucional? ────────────────
+  const porSede = sedes.map(s => { const x = pm.filter(m => m.Sede === s), med = c => { const v = x.map(m => m[c]).filter(y => y !== null && y !== undefined); return v.length ? fp(mediana(v)) : '—'; };
+    return { Sede: s, Matrices: x.length, 'V1 (mediana)': med('V1 %'), 'V4 (mediana)': med('V4 %'), 'V5 (mediana)': med('V5 %'), 'Con verbo repetido': x.filter(m => m.V2 === 'No').length }; });
   const top = prioridades.filter(p => p['No cumple'] + p.Parcial > 0).slice(0, 5);
-  const mapa = grafico([{ type: 'heatmap', x: vars, y: prioridades.map(p => p.Etiqueta), z: prioridades.map(p => vars.map(v => ORDEN_ESTADO.indexOf(p[v]))),
-    text: prioridades.map(p => vars.map(v => p[v])), hovertemplate: '%{y}<br>%{x}: %{text}<extra></extra>', xgap: 2, ygap: 1, showscale: false,
-    zmin: 0, zmax: 3, colorscale: [[0, MEDALLA.Cumple], [0.2499, MEDALLA.Cumple], [0.25, MEDALLA.Parcial], [0.4999, MEDALLA.Parcial], [0.5, MEDALLA['No cumple']], [0.7499, MEDALLA['No cumple']], [0.75, COLOR['Sin dato']], [1, COLOR['Sin dato']]] }],
-  { height: Math.max(220, 11 * prioridades.length + 60), yaxis: { autorange: 'reversed', showticklabels: prioridades.length <= 20, automargin: true }, xaxis: { side: 'top' }, margin: { l: prioridades.length <= 20 ? 250 : 10, r: 10, t: 30, b: 10 } });
   return h('div', {},
     aviso('info', veredicto),
-    h('p', { class: 'leyenda' }, kpis.map(([e, v]) => `${miles(v)} ${e.toLowerCase()}`).join(' · ')),
+    h('p', { class: 'leyenda' }, alcance.map(([e, v]) => `${miles(v)} ${e.toLowerCase()}`).join(' · ')),
     semaforo,
-    bloqueTendencias(principales),
-    h('h3', {}, 'Hallazgos clave'),
-    columnas(...tarjetas.slice(0, 3).map(card)),
-    columnas(...tarjetas.slice(3).map(card)),
+    seccionV1, seccionV2, seccionV3, seccionV4, seccionV5,
+    h('h3', {}, 'Comparación entre sedes'),
+    h('p', { class: 'leyenda' }, 'Mediana de cada variable por matriz en cada sede. Si las sedes se parecen, las mejoras se plantean a nivel institucional y no por sede.'),
+    tablaCorta(porSede, 'Sede'),
     h('h3', {}, 'Dónde actuar primero'),
-    h('p', { class: 'leyenda' }, 'Cada fila es una matriz y cada columna un criterio. Azul: cumple; amarillo: parcial; rosado: no cumple. Abajo, las cinco matrices con más criterios por atender.'),
-    mapa,
+    h('p', { class: 'leyenda' }, 'Las cinco matrices con más criterios en «No cumple» o «Parcial». El listado completo está en la pestaña «Listados de revisión».'),
     top.length ? tabla(top.map(p => ({ Matriz: p.Etiqueta, ...Object.fromEntries(CRITERIOS.map(([v, e]) => [`${v} ${e}`, ICONO[p[v]]])) })),
       ['Matriz', ...CRITERIOS.map(([v, e]) => `${v} ${e}`)].map(c => ({ title: c, field: c, ...(c === 'Matriz' ? { minWidth: 280 } : {}) })), { height: false })
-      : aviso('success', 'Todas las matrices cumplen los criterios evaluados.'),
-    h('p', { class: 'leyenda' }, 'El listado completo, las competencias huérfanas y los RA sin estrategia están en la pestaña «Listados de revisión».'));
+      : aviso('success', 'Todas las matrices cumplen los criterios evaluados.'));
 }
 
 /** ¿Los RA están asociados a estrategias mesocurriculares (Paso 4), micro (Paso 5), a las dos o a ninguna? */
