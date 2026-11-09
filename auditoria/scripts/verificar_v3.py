@@ -1,5 +1,5 @@
 """
-V3 (evaluabilidad) con regla operativa versionada, sobre RA únicos por matriz (D4).
+V3 (evaluabilidad) con regla operativa versionada, sobre RA únicos por matriz (D23: texto sin tildes ni puntuación).
 
 Estructura de redacción del RA en las matrices: VERBO + objeto + "para" + FINALIDAD + condición.
 Un RA es evaluable cuando:
@@ -74,7 +74,7 @@ for f in sorted(glob.glob('data/raw/FORMATOS RA CICLO UNO RC/*.xlsx')):
     unicos = {}
     for r in ws.iter_rows(min_row=3, values_only=True):
         if len(r) > 8 and r[8] not in (None, ''):
-            unicos.setdefault(str(r[8]).strip().lower(), (r[7] or '', str(r[8]).strip(),  # clave D4
+            unicos.setdefault(norm(r[8]), (r[7] or '', str(r[8]).strip(),  # clave D23: sin tildes ni puntuación
                               'ser' in norm(r[2] or '') or 'actitudinal' in norm(r[5] or '')))
     wb.close()
     ev = 0

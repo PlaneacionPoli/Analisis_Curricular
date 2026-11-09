@@ -1,0 +1,232 @@
+{
+ "fecha": "2026-11-05T04:40:35",
+ "python": "3.14.3",
+ "coinciden": 32,
+ "total": 32,
+ "chequeos": [
+  {
+   "resultado": "Matrices",
+   "archivo": "evidencia_corpus.json",
+   "publicado": 50,
+   "evidencia": 50,
+   "estado": "OK"
+  },
+  {
+   "resultado": "Competencias",
+   "archivo": "evidencia_corpus.json",
+   "publicado": 222,
+   "evidencia": 222,
+   "estado": "OK"
+  },
+  {
+   "resultado": "RA únicos",
+   "archivo": "evidencia_corpus.json",
+   "publicado": 338,
+   "evidencia": 338,
+   "estado": "OK"
+  },
+  {
+   "resultado": "Estrategias mesocurriculares",
+   "archivo": "evidencia_corpus.json",
+   "publicado": 391,
+   "evidencia": 391,
+   "estado": "OK"
+  },
+  {
+   "resultado": "Registros de asignatura",
+   "archivo": "evidencia_corpus.json",
+   "publicado": 1757,
+   "evidencia": 1757,
+   "estado": "OK"
+  },
+  {
+   "resultado": "Núcleos temáticos",
+   "archivo": "evidencia_control_nucleos.json",
+   "publicado": 6684,
+   "evidencia": 6684,
+   "estado": "OK"
+  },
+  {
+   "resultado": "Núcleos para revisión (%)",
+   "archivo": "evidencia_control_nucleos.json",
+   "publicado": 3.9,
+   "evidencia": 3.9,
+   "estado": "OK"
+  },
+  {
+   "resultado": "Atributos del perfil",
+   "archivo": "evidencia_asociacion_50_matrices.json",
+   "publicado": 2574,
+   "evidencia": 2574,
+   "estado": "OK"
+  },
+  {
+   "resultado": "V1: sin alineación (%)",
+   "archivo": "evidencia_asociacion_50_matrices.json",
+   "publicado": 3.8,
+   "evidencia": 3.8,
+   "estado": "OK"
+  },
+  {
+   "resultado": "V1: tres capas (%)",
+   "archivo": "evidencia_asociacion_50_matrices.json",
+   "publicado": 65.7,
+   "evidencia": 65.7,
+   "estado": "OK"
+  },
+  {
+   "resultado": "Calibración V1: acuerdo",
+   "archivo": "evidencia_calibracion_asociacion.json",
+   "publicado": 0.801,
+   "evidencia": 0.801,
+   "estado": "OK"
+  },
+  {
+   "resultado": "Calibración V1: κ",
+   "archivo": "evidencia_calibracion_asociacion.json",
+   "publicado": 0.441,
+   "evidencia": 0.441,
+   "estado": "OK"
+  },
+  {
+   "resultado": "V3: RA únicos evaluados",
+   "archivo": "evidencia_v3.json",
+   "publicado": 338,
+   "evidencia": 338,
+   "estado": "OK"
+  },
+  {
+   "resultado": "V3 (%)",
+   "archivo": "evidencia_v3.json",
+   "publicado": 100.0,
+   "evidencia": 100.0,
+   "estado": "OK"
+  },
+  {
+   "resultado": "V4 (%)",
+   "archivo": "evidencia_v4_alternativas.json",
+   "publicado": 87.0,
+   "evidencia": 87.0,
+   "estado": "OK"
+  },
+  {
+   "resultado": "V4 sin RA genérico (%)",
+   "archivo": "evidencia_v4_alternativas.json",
+   "publicado": 98.0,
+   "evidencia": 98.0,
+   "estado": "OK"
+  },
+  {
+   "resultado": "V4: RA sin estrategia",
+   "archivo": "evidencia_v4_alternativas.json",
+   "publicado": 44,
+   "evidencia": 44,
+   "estado": "OK"
+  },
+  {
+   "resultado": "Indicadores de logro",
+   "archivo": "evidencia_v5.json",
+   "publicado": 1185,
+   "evidencia": 1185,
+   "estado": "OK"
+  },
+  {
+   "resultado": "V5: N2 o superior (%)",
+   "archivo": "evidencia_v5.json",
+   "publicado": 95.4,
+   "evidencia": 95.4,
+   "estado": "OK"
+  },
+  {
+   "resultado": "Evidencia directa N3 (estrategias)",
+   "archivo": "evidencia_v5.json",
+   "publicado": 3,
+   "evidencia": 3,
+   "estado": "OK"
+  },
+  {
+   "resultado": "R7: H de V4",
+   "archivo": "evidencia_r6_r7.json",
+   "publicado": 3.86,
+   "evidencia": 3.86,
+   "estado": "OK"
+  },
+  {
+   "resultado": "R6: ρ V1–V4",
+   "archivo": "evidencia_r6_r7.json",
+   "publicado": -0.17,
+   "evidencia": -0.17,
+   "estado": "OK"
+  },
+  {
+   "resultado": "Denominaciones de asignatura",
+   "archivo": "evidencia_r8.json",
+   "publicado": 709,
+   "evidencia": 709,
+   "estado": "OK"
+  },
+  {
+   "resultado": "Homónimas divergentes",
+   "archivo": "evidencia_r8.json",
+   "publicado": 15,
+   "evidencia": 15,
+   "estado": "OK"
+  },
+  {
+   "resultado": "Similitud media de homónimas",
+   "archivo": "evidencia_r8.json",
+   "publicado": 0.928,
+   "evidencia": 0.928,
+   "estado": "OK"
+  },
+  {
+   "resultado": "IA: programas",
+   "archivo": "evidencia_tendencias_r82.json",
+   "publicado": 30,
+   "evidencia": 30,
+   "estado": "OK"
+  },
+  {
+   "resultado": "IA: asignaturas",
+   "archivo": "evidencia_tendencias_r82.json",
+   "publicado": 57,
+   "evidencia": 57,
+   "estado": "OK"
+  },
+  {
+   "resultado": "Revisores: acuerdo fuera de la muestra",
+   "archivo": "evidencia_revisores_v1.json",
+   "publicado": 0.771,
+   "evidencia": 0.771,
+   "estado": "OK"
+  },
+  {
+   "resultado": "Revisores: κ fuera de la muestra",
+   "archivo": "evidencia_revisores_v1.json",
+   "publicado": 0.39,
+   "evidencia": 0.39,
+   "estado": "OK"
+  },
+  {
+   "resultado": "Revisores: pares únicos de competencias",
+   "archivo": "evidencia_revisores_r.json",
+   "publicado": 185,
+   "evidencia": 185,
+   "estado": "OK"
+  },
+  {
+   "resultado": "Revisores: coherencia nivel–verbo (%)",
+   "archivo": "evidencia_revisores_v3.json",
+   "publicado": 96.4,
+   "evidencia": 96.4,
+   "estado": "OK"
+  },
+  {
+   "resultado": "Revisores: RA con producto explícito",
+   "archivo": "evidencia_revisores_v3.json",
+   "publicado": 13,
+   "evidencia": 13,
+   "estado": "OK"
+  }
+ ]
+}
